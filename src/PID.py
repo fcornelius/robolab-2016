@@ -12,8 +12,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        self.black = 75
-        self.white = 949
+        #self.black = 96
+        #self.white = 791
 
         self.err = 0
         self.mid = 0
@@ -27,8 +27,10 @@ class PID:
         self.follow()
 
 
+
     def init_comp(self,):
         self.motors = [ev3.LargeMotor(port) for port in ['outB', 'outC']]
+        for m in self.motors: m.reset()
         self.cs = ev3.ColorSensor()
         self.cs.mode = "RGB-RAW"
 
@@ -45,8 +47,8 @@ class PID:
 
         self.mid = (self.white+self.black)/2        # error = col-mid
         err_max = (self.white-self.black)/2
-        self.m = -(self.start_power/err_max)*1.3      # turn = slo*error
-        self.i = self.m/50
+        self.m = -(self.start_power/err_max)*1.0      # turn = slo*error
+        self.i = self.m/35
         print("White:", self.white, " Black: ", self.black, " m: ", self.m)
 
 
@@ -57,26 +59,36 @@ class PID:
             m.run_direct()
 
         integral = 0
-        last_err = 0
+        # last_err = 0
         error = 0
         d = 0           # direction (links oder rechts)
+        col = ()
+
         while True:
+            col = self.cs.bin_data("hhh")
+            if col[0] > col[1] + col[2]:
+                for m in self.motors:
+                    m.stop()
+                # ev3.Sound.beep()
+                # time.sleep(0.5)
+                # ev3.Sound.speak("  Awaiting command").wait()
+                break
+
             last_err = error
-            error = sum(self.cs.bin_data("hhh")) - self.mid
-
-
+            error = sum(col) - self.mid
 
             if d == 0:
                 d = 1 if error > 0 else -1
             elif error*d < 0:
                 d *= -1
-                integral = 0
+                # integral = 0
                 print("\nchanged dir\n")
             elif math.fabs(error-last_err) > 200:
-                integral = 0
+                # integral = 0
                 print("\nstep\n")
 
             integral += error
+            integral *= 2/3
 
             turn = error*self.m + integral*self.i
 
