@@ -3,6 +3,7 @@
 import ev3dev.ev3 as ev3
 import time
 import math
+import odometry as odometer
 
 class PID:
     def __init__(self):
@@ -24,6 +25,7 @@ class PID:
 
         self.init_comp()
         self.calibrate(self.cs)
+        self.odm = odometer.odometry()
         self.follow()
 
 
@@ -72,10 +74,14 @@ class PID:
                 for m in self.motors:
                     m.stop()
                 # ev3.Sound.beep()
-                # time.sleep(0.5)
-                # ev3.Sound.speak("  Awaiting command").wait()
+                time.sleep(0.5)
+                x = math.floor(self.odm.pos_x)
+                y = math.floor(self.odm.pos_y)
+                # ev3.Sound.speak("X is {} Y is {}".format(x,y)).wait()
                 break
 
+
+            self.odm.update(self.motors[0].position, self.motors[1].position)
 
             last_err = error
             error = sum(col) - self.mid
@@ -98,31 +104,12 @@ class PID:
             l_turn = turn
             r_turn = -turn
 
-            # if turn < -self.start_power+3:
-            #     back_turn *= 1.2
-            #     l_turn *= 1.6
-            # else: back_turn = 1
 
-            # if error < -400:
-            #     # self.motors[0].stop()
-            #     # self.motors[1].stop()
-            #
-            #     while error < 90:
-            #         error = sum(self.cs.bin_data("hhh")) - self.mid
-            #         self.motors[0].duty_cycle_sp = 20
-            #         self.motors[1].duty_cycle_sp = -20
-            #
-            #         self.motors[0].run_direct()
-            #         self.motors[1].run_direct()
-            # elif error > 400:
-            #     self.motors[0].stop()
-            #     self.motors[1].stop()
-            # else:
             self.motors[0].duty_cycle_sp = self.start_power + l_turn
             self.motors[1].duty_cycle_sp = self.start_power + r_turn
 
 
-            print("Error: {:6.2f} l_turn: {:5.2f} r_turn: {:5.2f} l: {:5.2f} r: {:5.2f}".format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp))
+            print("Error: {:6.2f} l_turn: {:5.2f} r_turn: {:5.2f} l: {:5.2f} r: {:5.2f} pos: {:6.3f} {:6.3}".format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp, self.odm.pos_x, self.odm.pos_y))
 
 
 pid = PID()

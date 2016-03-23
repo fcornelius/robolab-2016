@@ -17,7 +17,7 @@ class odometry:
         self.l_count = 0
         self.r_count = 0
         self.l_prevc = 0
-        self. r_prevc = 0
+        self.r_prevc = 0
 
 
     def update(self,l_pos, r_pos):
@@ -51,7 +51,7 @@ class odometry:
 
 
 
-        print("pos_x: ", self.pos_x, " pos_y: ", self.pos_y, " l_count: ", self.l_count, " r_count: ", self.r_count, " rotation: ", self.rotation," heading: ", self.heading, " l_speed: ", self.motors[1].speed)
+        # print("pos_x: ", self.pos_x, " pos_y: ", self.pos_y, " l_count: ", self.l_count, " r_count: ", self.r_count, " rotation: ", self.rotation," heading: ", self.heading, " l_speed: ", self.motors[1].speed)
 
 
 
