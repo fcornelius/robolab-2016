@@ -16,30 +16,42 @@ class odometry:
         self.heading = 0
         self.l_count = 0
         self.r_count = 0
+        self.l_prevc = 0
+        self. r_prevc = 0
 
-        self.motors = [ev3.LargeMotor(port) for port in ['outB', 'outC']]
-        for m in self.motors: m.reset()
 
-    def update(self):
+    def update(self,l_pos, r_pos):
 
-        self.motors[0].duty_cycle_sp = 20
-        self.motors[0].run_to_rel_pos(position_sp=720)
+        # self.motors[0].duty_cycle_sp = 30
+        # self.motors[1].duty_cycle_sp = 15
+        # self.motors[0].run_to_rel_pos(position_sp=1420)
+        # self.motors[1].run_to_rel_pos(position_sp=-720)
 
         # time.sleep(50)
-        while True:
-
-            self.l_count = motors[0]
-            self.displacement = (self.motors[0].position + self.motors[1].position) * self.scale_factor/2
-            self.rotation = (self.motors[0].position - self.motors[1].position)  * self.scale_factor/self.track
-
-            self.pos_x += self.displacement * math.cos(self.heading + self.rotation / 2)
-            self.pos_y += self.pos_y + self.displacement * math.sin(self.heading + self.rotation / 2)
-            self.heading += self.rotation
-
-            for m in self.motors: m.position = 0
-
-            print("pos_x: ", self.pos_x, " pos_y: ", self.pos_y, " heading: ", self.heading)
 
 
-OD = odometry()
-OD.update()
+        # l_pos = self.motors[0].position
+        # r_pos = self.motors[1].position
+
+        self.l_count = l_pos - self.l_prevc
+        self.r_count = r_pos - self.r_prevc
+
+        self.l_prevc = l_pos
+        self.r_prevc = r_pos
+
+
+        self.displacement = (self.l_count + self.r_count) * self.scale_factor/2
+        self.rotation = (self.l_count - self.r_count)  * self.scale_factor/self.track
+
+        self.pos_x += self.displacement * math.cos(self.heading + self.rotation / 2)
+        self.pos_y += self.displacement * math.sin(self.heading + self.rotation / 2)
+        self.heading += self.rotation
+
+        # print(l_pos, " ", self.l_count, " prevc ", self.l_prevc)
+
+
+
+        print("pos_x: ", self.pos_x, " pos_y: ", self.pos_y, " l_count: ", self.l_count, " r_count: ", self.r_count, " rotation: ", self.rotation," heading: ", self.heading, " l_speed: ", self.motors[1].speed)
+
+
+

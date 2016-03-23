@@ -12,8 +12,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        #self.black = 96
-        #self.white = 791
+        self.black = 112
+        self.white = 781
 
         self.err = 0
         self.mid = 0
@@ -28,7 +28,9 @@ class PID:
 
 
 
-    def init_comp(self,):
+
+
+    def init_comp(self):
         self.motors = [ev3.LargeMotor(port) for port in ['outB', 'outC']]
         for m in self.motors: m.reset()
         self.cs = ev3.ColorSensor()
@@ -73,6 +75,7 @@ class PID:
                 # time.sleep(0.5)
                 # ev3.Sound.speak("  Awaiting command").wait()
                 break
+
 
             last_err = error
             error = sum(col) - self.mid
