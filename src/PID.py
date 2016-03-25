@@ -13,13 +13,14 @@ class PID:
         self.white = 0
         self.black = 0
 
-        self.black = 98
-        self.white = 879
+        self.black = 100
+        self.white = 836
 
         self.err = 0
         self.mid = 0
         self.m = 0
         self.i = 0
+        self.d = 0
         self.start_power = 26
         self.power_offset = -5
 
@@ -27,7 +28,7 @@ class PID:
         self.calibrate(self.cs)
         self.odm = odometer.odometry()
 
-        self.correct = 5
+        self.knots = [[]]
         self.follow()
 
 
@@ -36,7 +37,9 @@ class PID:
 
     def init_comp(self):
         self.motors = [ev3.LargeMotor(port) for port in ['outB', 'outC']]
-        for m in self.motors: m.reset()
+        for m in self.motors:
+            m.reset()
+            m.stop_command = "brake"
         self.cs = ev3.ColorSensor()
         self.cs.mode = "RGB-RAW"
 
@@ -54,7 +57,8 @@ class PID:
         self.mid = (self.white+self.black)/2        # error = col-mid
         err_max = (self.white-self.black)/2
         self.m = -(self.start_power/err_max)*1.0      # turn = slo*error
-        self.i = self.m/35
+        self.i = self.m/20
+        self.d = self.m * 10
         print("White:", self.white, " Black: ", self.black, " m: ", self.m)
 
 
@@ -65,7 +69,8 @@ class PID:
             m.run_direct()
 
         integral = 0
-        # last_err = 0
+        deriv = 0
+        last_err = 0
         error = 0
         d = 0           # direction (links oder rechts)
         col = ()
@@ -75,6 +80,9 @@ class PID:
             if col[0] > col[1] + col[2]:
 
 
+                # quit()
+
+                self.knots.append([])
 
                 ev3.Sound.beep()
                 x = math.floor(self.odm.pos_x)
@@ -82,36 +90,68 @@ class PID:
                 print(x, y)
                 # Weiter vorfahren:
 
+
+                print(self.odm.heading, " ", math.degrees(self.odm.heading))
+                print(self.motors[0].duty_cycle_sp, " ", self.motors[0].duty_cycle_sp)
+
+
+                self.motors[0].run_direct(duty_cycle_sp = 15)
+                self.motors[1].run_direct(duty_cycle_sp = 15)
+
+                time.sleep(5)
+                quit()
+
                 while col[0] > col[1] + col[2]:
                     col = self.cs.bin_data("hhh")
-                    self.motors[0].run_direct(duty_cycle_sp = 15)
-                    self.motors[1].run_direct(duty_cycle_sp = 15)
+                    self.odm.update(self.motors[0].position, self.motors[1].position)
+
+                self.motors[0].run_to_rel_pos(position_sp=25)
+                self.motors[1].run_to_rel_pos(position_sp=25)
+
+                while self.motors[0].speed > 0:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
 
 
-                self.motors[0].run_to_rel_pos(position_sp=20)
-                self.motors[1].run_to_rel_pos(position_sp=20)
-                self.odm.update(self.motors[0].position, self.motors[1].position)
 
                 # Drehen:
 
+                for dir in range(4):
+                    col = self.cs.bin_data("hhh")
 
-                self.motors[0].run_direct(duty_cycle_sp = -15)
-                self.motors[1].run_direct(duty_cycle_sp = 15)
+                    if sum(col) < 700:
+                        ev3.Sound.speak("Path found").wait()
+                        self.knots[-1].append(dir)
+
+
+
+
+                    self.motors[0].run_to_rel_pos(position_sp=174, duty_cycle_sp=25)
+                    self.motors[1].run_to_rel_pos(position_sp=-174, duty_cycle_sp=25)
+
+                    time.sleep(2)
+
+
 
                 # for m in self.motors:
                 #     m.stop()
 
-
-                time.sleep(10)
+                print(self.knots)
                 print(self.odm.pos_x, self.odm.pos_y)
-                # ev3.Sound.speak("X is {} Y is {}".format(x,y)).wait()
+
+
+                self.motors[0].run_to_rel_pos(position_sp=self.knots[-1][0] * 174, duty_cycle_sp=25)
+                self.motors[1].run_to_rel_pos(position_sp=self.knots[-1][0] * -174, duty_cycle_sp=25)
+
+                time.sleep(2)
+
+                self.follow()
+
                 break
 
 
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
-            last_err = error
+
             error = sum(col) - self.mid
 
             if d == 0:
@@ -127,7 +167,9 @@ class PID:
             integral += error
             integral *= 2/3
 
-            turn = error*self.m + integral*self.i
+            deriv -= last_err
+
+            turn = error*self.m + integral*self.i + deriv*self.d
 
             l_turn = turn
             r_turn = -turn
@@ -141,6 +183,8 @@ class PID:
                   .format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp,
                           self.odm.pos_x, self.odm.pos_y, self.odm.heading, self.odm.l_count, self.odm.r_count,
                           self.odm.rotation, self.odm.displacement))
+
+            last_err = error
 
 
 
