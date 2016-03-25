@@ -13,8 +13,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        self.black = 112
-        self.white = 781
+        self.black = 98
+        self.white = 879
 
         self.err = 0
         self.mid = 0
@@ -26,6 +26,8 @@ class PID:
         self.init_comp()
         self.calibrate(self.cs)
         self.odm = odometer.odometry()
+
+        self.correct = 5
         self.follow()
 
 
@@ -71,12 +73,38 @@ class PID:
         while True:
             col = self.cs.bin_data("hhh")
             if col[0] > col[1] + col[2]:
-                for m in self.motors:
-                    m.stop()
-                # ev3.Sound.beep()
-                time.sleep(0.5)
+
+
+
+                ev3.Sound.beep()
                 x = math.floor(self.odm.pos_x)
                 y = math.floor(self.odm.pos_y)
+                print(x, y)
+                # Weiter vorfahren:
+
+                while col[0] > col[1] + col[2]:
+                    col = self.cs.bin_data("hhh")
+                    self.motors[0].run_direct(duty_cycle_sp = 15)
+                    self.motors[1].run_direct(duty_cycle_sp = 15)
+                    self.odm.update(self.motors[0].position, self.motors[1].position)
+
+
+                self.motors[0].run_to_rel_pos(position_sp=20)
+                self.motors[1].run_to_rel_pos(position_sp=20)
+                self.odm.update(self.motors[0].position, self.motors[1].position)
+
+                # Drehen:
+
+
+                self.motors[0].run_direct(duty_cycle_sp = -15)
+                self.motors[1].run_direct(duty_cycle_sp = 15)
+
+                # for m in self.motors:
+                #     m.stop()
+
+
+                time.sleep(10)
+                print(self.odm.pos_x, self.odm.pos_y)
                 # ev3.Sound.speak("X is {} Y is {}".format(x,y)).wait()
                 break
 
@@ -109,7 +137,11 @@ class PID:
             self.motors[1].duty_cycle_sp = self.start_power + r_turn
 
 
-            print("Error: {:6.2f} l_turn: {:5.2f} r_turn: {:5.2f} l: {:5.2f} r: {:5.2f} pos: {:6.3f} {:6.3}".format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp, self.odm.pos_x, self.odm.pos_y))
+            print("Error: {:7.2f}   l_turn: {:5.2f}   r_turn: {:5.2f}   l: {:5.2f}   r: {:5.2f}   posX: {:6.3f}   posY: {:6.3f}   heading: {:6.2f}   l_change: {:6.2f}   r_change: {:6.2f}   rotation: {:6.2f}   displacement: {:6.2f}"
+                  .format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp,
+                          self.odm.pos_x, self.odm.pos_y, self.odm.heading, self.odm.l_count, self.odm.r_count,
+                          self.odm.rotation, self.odm.displacement))
+
 
 
 pid = PID()
