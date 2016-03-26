@@ -20,6 +20,17 @@ class odometry:
         self.r_prevc = 0
 
 
+    def reset(self):
+        self.displacement = 0
+        self.rotation = 0
+        self.heading = 0
+        self.l_count = 0
+        self.r_count = 0
+        self.l_prevc = 0
+        self.r_prevc = 0
+        self.pos_x = 0
+        self.pos_y = 0
+
     def update(self,l_pos, r_pos):
 
         # self.motors[0].duty_cycle_sp = 30

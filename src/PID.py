@@ -28,7 +28,7 @@ class PID:
         self.calibrate(self.cs)
         self.odm = odometer.odometry()
 
-        self.knots = [[]]
+        self.knots = []
         self.follow()
 
 
@@ -58,9 +58,9 @@ class PID:
         self.mid = (self.white+self.black)/2          # error = col-mid
         err_max = (self.white-self.black)/2
 
-        self.m = -(self.start_power/err_max)*1.0      # turn = slo*error
-        self.i = self.m/45
-        self.d = self.m /10
+        self.m = -(self.start_power/err_max)*1.0     # turn = slo*error
+        self.i = self.m/20
+        self.d = self.m * 10
         print("White:", self.white, " Black: ", self.black, " m: ", self.m, "i:", self.i, "d:", self.d)
 
 
@@ -89,10 +89,10 @@ class PID:
 
             error = sum(col) - self.mid
             integral += error
-            integral *= 2/3
+            integral *= 1/3
             deriv = error - last_err
 
-            turn = error*self.m #+ integral*self.i #+ deriv*self.d
+            turn = error*self.m + integral*self.i # + deriv*0.04
 
             l_turn = turn
             r_turn = -turn
@@ -110,8 +110,8 @@ class PID:
             last_err = error
 
     def crossing_reached(self):
-
-        self.knots.append([])
+        col = self.cs.bin_data("hhh")
+        self.knots.append({})
 
         x = math.floor(self.odm.pos_x)
         y = math.floor(self.odm.pos_y)
@@ -130,6 +130,7 @@ class PID:
 
 
 
+
         self.motors[0].run_direct(duty_cycle_sp = 15)
         self.motors[1].run_direct(duty_cycle_sp = 15)
 
@@ -143,6 +144,41 @@ class PID:
 
         while self.motors[0].speed > 0:
             self.odm.update(self.motors[0].position, self.motors[1].position)
+
+        print("\n\nThis: X:", math.floor(self.odm.pos_x), "Y:", math.floor(self.odm.pos_y))
+
+        x = math.floor(self.odm.pos_x)
+        y =  math.floor(self.odm.pos_y)
+
+
+        self.knots[-1]["x"] = x
+        self.knots[-1]["y"] = y
+
+
+
+        print(self.knots)
+
+
+
+        if len(self.knots) > 1:
+            x_rel = x - self.knots[-2]["x"]
+            y_rel = y - self.knots[-2]["y"]
+
+            x_rel_cor = x_rel / 40 + ((x_rel%40)*2) / 40
+            y_rel_cor = y_rel / 40 + ((y_rel%40)*2) / 40
+
+            print("rel: X", x_rel, "Y",y_rel, "x_rel_cor", x_rel_cor, "y_rel_cor", y_rel_cor)
+            ev3.Sound.speak("X {} Y {}".format(math.floor(self.odm.pos_x) - self.knots[-2]["x"], math.floor(self.odm.pos_y) - self.knots[-2]["y"])).wait()
+        else:
+            ev3.Sound.speak("X {} Y {}".format(math.floor(self.odm.pos_x), math.floor(self.odm.pos_y))).wait()
+
+
+        time.sleep(5)
+
+
+
+        self.follow()
+        quit()
 
         # quit()
 
