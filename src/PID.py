@@ -123,17 +123,18 @@ class PID:
             m.stop()
 
         c = self.motors[0].duty_cycle_sp - self.motors[1].duty_cycle_sp
-        self.motors[1].run_to_rel_pos(position_sp=c, duty_cycle_sp = 15)
+        self.motors[1].run_to_rel_pos(position_sp=0.7 * c, duty_cycle_sp = 15)
 
         while self.motors[1].speed > 0:
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
 
 
+        self.motors[0].run_direct(duty_cycle_sp = 16)
+        self.motors[1].run_direct(duty_cycle_sp = 16)
 
-        self.motors[0].run_direct(duty_cycle_sp = 15)
-        self.motors[1].run_direct(duty_cycle_sp = 15)
-
+        time.sleep(2)
+        quit()
 
         while col[0] > col[1] + col[2]:
             col = self.cs.bin_data("hhh")
