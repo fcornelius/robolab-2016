@@ -164,14 +164,17 @@ class PID:
             x_rel = x - self.knots[-2]["x"]
             y_rel = y - self.knots[-2]["y"]
 
-            x_rel_cor = x_rel / 40 + ((x_rel%40)*2) / 40
-            y_rel_cor = y_rel / 40 + ((y_rel%40)*2) / 40
+            x_rel_cor = x_rel // 40 + ((x_rel%40)*2) // 40
+            y_rel_cor = y_rel // 40 + ((y_rel%40)*2) // 40
 
             print("rel: X", x_rel, "Y",y_rel, "x_rel_cor", x_rel_cor, "y_rel_cor", y_rel_cor)
-            ev3.Sound.speak("X {} Y {}".format(math.floor(self.odm.pos_x) - self.knots[-2]["x"], math.floor(self.odm.pos_y) - self.knots[-2]["y"])).wait()
+            ev3.Sound.speak("X {} Y {}".format(x_rel_cor, y_rel_cor)).wait()
         else:
-            ev3.Sound.speak("X {} Y {}".format(math.floor(self.odm.pos_x), math.floor(self.odm.pos_y))).wait()
+            x_cor =  x // 40 + ((x%40)*2) // 40
+            y_cor =  y // 40 + ((y%40)*2) // 40
 
+            print("X", x, "Y",y, "x_cor", x_cor, "y_cor", y_cor)
+            ev3.Sound.speak("X {} Y {}".format(x_cor, y_cor)).wait()
 
         time.sleep(5)
 
