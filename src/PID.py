@@ -57,7 +57,7 @@ class PID:
         self.mid = (self.white+self.black)/2        # error = col-mid
         err_max = (self.white-self.black)/2
         self.m = -(self.start_power/err_max)*1.0      # turn = slo*error
-        self.i = self.m/20
+        self.i = self.m/30
         self.d = self.m * 10
         print("White:", self.white, " Black: ", self.black, " m: ", self.m)
 
@@ -80,26 +80,28 @@ class PID:
             if col[0] > col[1] + col[2]:
 
 
-                # quit()
-
                 self.knots.append([])
 
-                ev3.Sound.beep()
                 x = math.floor(self.odm.pos_x)
                 y = math.floor(self.odm.pos_y)
                 print(x, y)
+
                 # Weiter vorfahren:
 
+                for m in self.motors:
+                    m.stop()
 
-                print(self.odm.heading, " ", math.degrees(self.odm.heading))
-                print(self.motors[0].duty_cycle_sp, " ", self.motors[0].duty_cycle_sp)
+                c = self.motors[0].duty_cycle_sp - self.motors[1].duty_cycle_sp
+                self.motors[1].run_to_rel_pos(position_sp=c, duty_cycle_sp = 15)
+
+                while self.motors[1].speed > 0:
+                    self.odm.update(self.motors[0].position, self.motors[1].position)
+
 
 
                 self.motors[0].run_direct(duty_cycle_sp = 15)
                 self.motors[1].run_direct(duty_cycle_sp = 15)
 
-                time.sleep(5)
-                quit()
 
                 while col[0] > col[1] + col[2]:
                     col = self.cs.bin_data("hhh")
@@ -111,15 +113,43 @@ class PID:
                 while self.motors[0].speed > 0:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
 
-
+                # quit()
 
                 # Drehen:
+
+                deg = math.degrees(self.odm.heading)
+                turned = 0
+                lpos = self.motors[0].position
+
+                self.motors[0].run_direct(duty_cycle_sp = 25)
+                self.motors[1].run_direct(duty_cycle_sp = -25)
+
+                while turned < 200:
+
+                    while self.motors[0].position - lpos < 60:
+                        self.odm.update(self.motors[0].position, self.motors[1].position)
+                        turned = math.degrees(self.odm.heading) - deg
+                        print("turned: ", turned, "lpos:", lpos)
+
+
+                    col = self.cs.bin_data("hhh")
+                    while sum(col) > self.white-300:
+                        self.odm.update(self.motors[0].position, self.motors[1].position)
+                        turned = math.degrees(self.odm.heading) - deg
+                        col = self.cs.bin_data("hhh")
+                        print("turned: ", turned, "lpos:", lpos, "col", sum(col))
+
+                    lpos = self.motors[0].position
+
+                    print("path at", turned)
+
+
 
                 for dir in range(4):
                     col = self.cs.bin_data("hhh")
 
                     if sum(col) < 700:
-                        ev3.Sound.speak("Path found").wait()
+                        # ev3.Sound.speak("Path found").wait()
                         self.knots[-1].append(dir)
 
 
@@ -169,7 +199,7 @@ class PID:
 
             deriv -= last_err
 
-            turn = error*self.m + integral*self.i + deriv*self.d
+            turn = error*self.m + integral*self.i # + deriv*0.01
 
             l_turn = turn
             r_turn = -turn
