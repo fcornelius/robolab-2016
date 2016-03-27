@@ -81,7 +81,7 @@ class PID:
             col = self.cs.bin_data("hhh")
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
-            if col[0] > col[1] + col[2]:
+            if col[0] > col[1] + col[2]:   # Rot erkannt
 
                 self.crossing_reached()
                 break
@@ -122,34 +122,44 @@ class PID:
         for m in self.motors:
             m.stop()
 
+        # ev3.Sound.speak("left {} right {}".format(self.motors[0].duty_cycle_sp,self.motors[1].duty_cycle_sp)).wait()
+
+        # Rotausgleich
         c = self.motors[0].duty_cycle_sp - self.motors[1].duty_cycle_sp
-        self.motors[1].run_to_rel_pos(position_sp=0.7 * c, duty_cycle_sp = 15)
+        self.motors[1].run_to_rel_pos(position_sp=1.5 * c, duty_cycle_sp = 15)
 
         while self.motors[1].speed > 0:
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
+        # time.sleep(2)
+        # quit()
+
+        self.motors[0].run_direct(duty_cycle_sp = 15)
+        self.motors[1].run_direct(duty_cycle_sp = 15)
 
 
-        self.motors[0].run_direct(duty_cycle_sp = 16)
-        self.motors[1].run_direct(duty_cycle_sp = 16)
-
-        time.sleep(2)
-        quit()
 
         while col[0] > col[1] + col[2]:
             col = self.cs.bin_data("hhh")
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
-        self.motors[0].run_to_rel_pos(position_sp=25)
-        self.motors[1].run_to_rel_pos(position_sp=25)
+
+        # quit()
+
+        self.motors[0].run_to_rel_pos(position_sp=40)
+        self.motors[1].run_to_rel_pos(position_sp=40)
 
         while self.motors[0].speed > 0:
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
+        # time.sleep(3)
+        # self.follow()
+        # quit()
+
         print("\n\nThis: X:", math.floor(self.odm.pos_x), "Y:", math.floor(self.odm.pos_y))
 
         x = math.floor(self.odm.pos_x)
-        y =  math.floor(self.odm.pos_y)
+        y = math.floor(self.odm.pos_y)
 
 
         self.knots[-1]["x"] = x
@@ -159,23 +169,18 @@ class PID:
 
         print(self.knots)
 
-
-
-        if len(self.knots) > 1:
-            x_rel = x - self.knots[-2]["x"]
-            y_rel = y - self.knots[-2]["y"]
-
-            x_rel_cor = x_rel // 40 + ((x_rel%40)*2) // 40
-            y_rel_cor = y_rel // 40 + ((y_rel%40)*2) // 40
-
-            print("rel: X", x_rel, "Y",y_rel, "x_rel_cor", x_rel_cor, "y_rel_cor", y_rel_cor)
-            ev3.Sound.speak("X {} Y {}".format(x_rel_cor, y_rel_cor)).wait()
+        if len(self.knots) == 1:
+            self.knots[0]["x_cord"] = x // 40 + ((x%40)*2) // 40
+            self.knots[0]["y_cord"] = y // 40 + ((y%40)*2) // 40
         else:
-            x_cor =  x // 40 + ((x%40)*2) // 40
-            y_cor =  y // 40 + ((y%40)*2) // 40
+            x = x - self.knots[-2]["x"]  # relative x und y zum vorigen Knoten
+            y = y - self.knots[-2]["y"]
+            self.knots[-1]["x_cord"] = self.knots[-2]["x_cord"] + x // 40 + ((x%40)*2) // 40    # relative x und y in Kord. umrechnen, dann draufaddieren,
+            self.knots[-1]["y_cord"] = self.knots[-2]["y_cord"] + y // 40 + ((y%40)*2) // 40    # sodass keine Folgefehler in der Kord. Bestimmung entstehen
 
-            print("X", x, "Y",y, "x_cor", x_cor, "y_cor", y_cor)
-            ev3.Sound.speak("X {} Y {}".format(x_cor, y_cor)).wait()
+        ev3.Sound.speak("X {} Y {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])).wait()
+
+
 
         time.sleep(5)
 
