@@ -224,7 +224,7 @@ class PID:
             while self.motors[0].position - lpos < 90 and turned < 330:
                 self.odm.update(self.motors[0].position, self.motors[1].position)
                 turned = math.degrees(self.odm.heading) - deg
-                print("turned: ", turned, "lpos:", lpos)
+                print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
 
             # quit()
 
@@ -233,7 +233,7 @@ class PID:
                 self.odm.update(self.motors[0].position, self.motors[1].position)
                 turned = math.degrees(self.odm.heading) - deg
                 col = self.cs.bin_data("hhh")
-                print("turned: ", turned, "lpos:", lpos, "col", sum(col))
+                print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos, "col", sum(col))
 
             # ev3.Sound.beep()
 
@@ -252,13 +252,16 @@ class PID:
         deg = math.degrees(self.odm.heading)
         lpos = self.motors[0].position
 
+        print("scan completed\n")
+        turned = 0
+
         if not go_straight:
             for path in self.knots[-1]["paths"]:
 
                 while self.motors[0].position - lpos < 90:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     turned = math.degrees(self.odm.heading) - deg
-                    print("turned: ", turned, "lpos:", lpos)
+                    print("turned: ", turned, "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
 
                 # quit()
 
@@ -267,7 +270,7 @@ class PID:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     turned = math.degrees(self.odm.heading) - deg
                     col = self.cs.bin_data("hhh")
-                    print("turned: ", turned, "lpos:", lpos, "col", sum(col))
+                    print("turned: ", turned,  "heading:", math.degrees(self.odm.heading),  "lpos:", lpos, "col", sum(col))
 
                 # print(self.deg_to_pathnum())
                 print("\nheading:", math.degrees(self.odm.heading))
@@ -280,6 +283,7 @@ class PID:
                         self.odm.update(self.motors[0].position, self.motors[1].position)
                     for m in self.motors: m.stop()
                     print("Visiting", self.deg_to_pathnum())
+                    ev3.Sound.speak("Visiting {}".format(self.deg_to_pathnum()))
                     self.odm.reset(self.pathnum_to_rad(self.deg_to_pathnum()))
                     self.motors[0].reset()
                     self.motors[1].reset()
@@ -287,6 +291,16 @@ class PID:
                     print("reset heading to:", self.pathnum_to_rad(self.deg_to_pathnum()))
                     print("heading now:", self.odm.heading)
                     break
+        else:
+            for m in self.motors: m.stop()
+            print("Visiting", self.deg_to_pathnum())
+            ev3.Sound.speak("Visiting {}".format(self.deg_to_pathnum())).wait()
+            self.odm.reset(self.pathnum_to_rad(self.deg_to_pathnum()))
+            self.motors[0].reset()
+            self.motors[1].reset()
+
+            print("reset heading to:", self.pathnum_to_rad(self.deg_to_pathnum()))
+            print("heading now:", self.odm.heading)
 
         print(self.knots[-1]["not_visited"])
         self.follow()
@@ -318,14 +332,16 @@ class PID:
 
         deg = math.degrees(self.odm.heading)
 
-        if -20 < deg%360 < 30 or -20 < deg < 30:
+        if -30 < deg%360 < 30 or -20 < deg < 30:
             return 1
-        elif 30 < deg%360 < 120:
+        elif 30 < deg%360 < 110:
             return 2
-        elif 120 < deg%360 < 180:
+        elif 110 < deg%360 < 180:
             return 3
-        elif 180 < deg%360 < 300:
+        elif 180 < deg%360 < 270:
             return 4
+        elif 270 < deg%360 < 380:
+            return 1
 
     def deg_to_enter(self):
 
@@ -333,9 +349,9 @@ class PID:
 
         if -20 < deg%360 < 30 or -20 < deg < 30:
             return 3
-        elif 30 < deg%360 < 120:
+        elif 30 < deg%360 < 110:
             return 4
-        elif 120 < deg%360 < 200:
+        elif 110 < deg%360 < 200:
             return 1
         elif 200 < deg%360 < 300:
             return 2
