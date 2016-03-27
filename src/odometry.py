@@ -13,6 +13,7 @@ class odometry:
         self.scale_factor = math.pi * (self.diameter/360)
         self.displacement = 0
         self.rotation = 0
+        # self.heading = -1.5707963267948966
         self.heading = 0
         self.l_count = 0
         self.r_count = 0
@@ -20,16 +21,15 @@ class odometry:
         self.r_prevc = 0
 
 
-    def reset(self):
+    def reset(self, heading):
         self.displacement = 0
         self.rotation = 0
-        self.heading = 0
+        self.heading = heading
         self.l_count = 0
         self.r_count = 0
         self.l_prevc = 0
         self.r_prevc = 0
-        self.pos_x = 0
-        self.pos_y = 0
+
 
     def update(self,l_pos, r_pos):
 
@@ -58,6 +58,7 @@ class odometry:
         self.pos_y += self.displacement * math.sin(self.heading + self.rotation / 2)
         self.heading += self.rotation
 
+        # print("heading (deg):", math.degrees(self.heading), "heading: ", self.heading, "rotation:", self.rotation, "displacement:", self.displacement)
         # print(l_pos, " ", self.l_count, " prevc ", self.l_prevc)
 
 
