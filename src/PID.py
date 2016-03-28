@@ -13,8 +13,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        self.black = 90
-        self.white = 766
+        self.black = 101
+        self.white = 838
 
         self.err = 0
         self.mid = 0
@@ -133,8 +133,7 @@ class PID:
         while self.motors[1].speed > 0:
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
-        # time.sleep(2)
-        # quit()
+
 
         self.motors[0].run_direct(duty_cycle_sp = 15)
         self.motors[1].run_direct(duty_cycle_sp = 15)
@@ -146,7 +145,7 @@ class PID:
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
 
-        # quit()
+
 
         self.motors[0].run_to_rel_pos(position_sp=40)
         self.motors[1].run_to_rel_pos(position_sp=40)
@@ -154,9 +153,9 @@ class PID:
         while self.motors[0].speed > 0:
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
-        # time.sleep(3)
-        # self.follow()
-        # quit()
+
+
+
 
         print("\n\nThis: X:", math.floor(self.odm.pos_x), "Y:", math.floor(self.odm.pos_y))
 
@@ -176,22 +175,29 @@ class PID:
             x = x - self.knots[-2]["x"]  # relative x und y zum vorigen Knoten
             y = y - self.knots[-2]["y"]
 
-            ev3.Sound.speak("X {} Y {} ".format(x,y)).wait()
+            # ev3.Sound.speak("X {} Y {} ".format(x,y)).wait()
             print("X {} Y {} ".format(x,y))
             self.knots[-1]["x_cord"] = self.knots[-2]["x_cord"] + x // 40 + ((x%40)*2) // 40    # relative x und y in Kord. umrechnen, dann draufaddieren,
             self.knots[-1]["y_cord"] = self.knots[-2]["y_cord"] + y // 40 + ((y%40)*2) // 40    # sodass keine Folgefehler in der Kord. Bestimmung entstehen
 
-        ev3.Sound.speak("X {} Y {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])).wait()
+        # ev3.Sound.speak("X {} Y {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])).wait()
         print(self.knots)
 
-        # quit()
+
 
         self.knots[-1]["paths"] = []
         self.knots[-1]["not_visited"] = []
         turns = 0
 
-        ev3.Sound.speak("Enter at {}".format(self.deg_to_enter())).wait()
+        # Enter
+
+        # ev3.Sound.speak("Enter at {}".format(self.deg_to_enter())).wait()
         enter_at = self.deg_to_enter()
+        enter_deg = math.degrees(self.odm.heading)
+        print("\n\nEnter:", enter_deg,"\n")
+
+
+
         # gradeaus checken:
 
         col = self.cs.bin_data("hhh")
@@ -253,6 +259,9 @@ class PID:
         lpos = self.motors[0].position
 
         print("scan completed\n")
+        print(turned)
+        # quit()
+
         turned = 0
 
         if not go_straight:
@@ -277,10 +286,12 @@ class PID:
 
                 lpos = self.motors[0].position
                 print("  pathnum", self.deg_to_pathnum(), "knots:", self.knots[-1]["not_visited"],"\n\n")
+                print("\nchecking ",enter_deg,"+",turned,"(",self.turn_to_real_deg(turned),") =", enter_deg+self.turn_to_real_deg(turned)," for pathnum\n")
 
                 if self.deg_to_pathnum() in self.knots[-1]["not_visited"]:
-                    while self.motors[0].position - lpos < 15:
+                    while self.motors[0].position - lpos < 25:
                         self.odm.update(self.motors[0].position, self.motors[1].position)
+                        print("going further...",turned)
                     for m in self.motors: m.stop()
                     print("Visiting", self.deg_to_pathnum())
                     ev3.Sound.speak("Visiting {}".format(self.deg_to_pathnum()))
@@ -301,6 +312,8 @@ class PID:
 
             print("reset heading to:", self.pathnum_to_rad(self.deg_to_pathnum()))
             print("heading now:", self.odm.heading)
+
+        print(turned)
 
         print(self.knots[-1]["not_visited"])
         self.follow()
@@ -332,11 +345,11 @@ class PID:
 
         deg = math.degrees(self.odm.heading)
 
-        if -30 < deg%360 < 30 or -20 < deg < 30:
+        if -30 < deg%360 < 55 or -20 < deg < 55:
             return 1
-        elif 30 < deg%360 < 110:
+        elif 55 < deg%360 < 140:
             return 2
-        elif 110 < deg%360 < 180:
+        elif 140 < deg%360 < 230:
             return 3
         elif 180 < deg%360 < 270:
             return 4
@@ -347,13 +360,13 @@ class PID:
 
         deg = math.degrees(self.odm.heading)
 
-        if -20 < deg%360 < 30 or -20 < deg < 30:
+        if -20 < deg%360 < 50 or -20 < deg < 50:
             return 3
         elif 30 < deg%360 < 110:
             return 4
         elif 110 < deg%360 < 200:
             return 1
-        elif 200 < deg%360 < 300:
+        elif 200 < deg%360 < 320:
             return 2
 
     def pathnum_to_rad(self, num):
@@ -368,6 +381,18 @@ class PID:
             deg = -90
 
         return math.radians(deg)
+
+    def turn_to_real_deg(self, turn):
+        deg = 0
+
+        if 40 < turn < 120:
+            deg = 90
+        elif 120 < deg < 200:
+            deg = 180
+        elif 200 < deg < 290:
+            deg = 270
+
+        return deg
 
 
 
