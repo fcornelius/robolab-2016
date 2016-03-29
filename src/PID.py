@@ -30,6 +30,9 @@ class PID:
 
         self.knots = []
         self.cords = []
+        self.go_back = False
+        self.backtrack = False
+
         self.follow()
 
 
@@ -103,18 +106,15 @@ class PID:
             self.motors[1].duty_cycle_sp = self.start_power + r_turn
 
 
-            # print("Error: {:7.2f}   l_turn: {:5.2f}   r_turn: {:5.2f}   l: {:5.2f}   r: {:5.2f}   posX: {:6.3f}   posY: {:6.3f}   heading: {:6.2f}   l_change: {:6.2f}   r_change: {:6.2f}   rotation: {:6.2f}   displacement: {:6.2f} heading_deg: {:6.2f} l pos: {:6.2f} r pos: {:6.2f}"
-            #       .format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp,
-            #               self.odm.pos_x, self.odm.pos_y, self.odm.heading, self.odm.l_count, self.odm.r_count,
-            #               self.odm.rotation, self.odm.displacement, math.degrees(self.odm.heading), self.motors[0].position, self.motors[1].position))
+            print("Error: {:7.2f}   l_turn: {:5.2f}   r_turn: {:5.2f}   l: {:5.2f}   r: {:5.2f}   posX: {:6.3f}   posY: {:6.3f}   heading: {:6.2f}   l_change: {:6.2f}   r_change: {:6.2f}   rotation: {:6.2f}   displacement: {:6.2f} heading_deg: {:6.2f} l pos: {:6.2f} r pos: {:6.2f}"
+                  .format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp,
+                          self.odm.pos_x, self.odm.pos_y, self.odm.heading, self.odm.l_count, self.odm.r_count,
+                          self.odm.rotation, self.odm.displacement, math.degrees(self.odm.heading), self.motors[0].position, self.motors[1].position))
 
             last_err = error
 
     def crossing_reached(self):
         col = self.cs.bin_data("hhh")
-
-        self.knots.append({})
-        self.knots[-1]["ways_out"] = ""
 
         x = math.floor(self.odm.pos_x)
         y = math.floor(self.odm.pos_y)
@@ -164,49 +164,70 @@ class PID:
 
         x = math.floor(self.odm.pos_x)
         y = math.floor(self.odm.pos_y)
+        x_cord = 0
+        y_cord = 0
 
-        self.knots[-1]["x"] = x
-        self.knots[-1]["y"] = y
 
 
-        if len(self.knots) == 1:
-            self.knots[0]["x_cord"] = x // 40 + ((x%40)*2) // 40
-            self.knots[0]["y_cord"] = y // 40 + ((y%40)*2) // 40
+        print("len knots: ", len(self.knots))
+        if len(self.knots) == 0:
+
+            # x_cord = x // 40 + ((x%40)*2) // 40
+            # y_cord = y // 40 + ((y%40)*2) // 40
+
+            x_cord = 0
+            y_cord = 0
+            x = 0
+            y = 0
+            self.odm.pos_x = 0
+            self.odm.pos_y = 0
+
         else:
-            x = x - self.knots[-2]["x"]  # relative x und y zum vorigen Knoten
-            y = y - self.knots[-2]["y"]
+            x_rel = x - self.knots[-1]["x"]  # relative x und y zum vorigen Knoten
+            y_rel = y - self.knots[-1]["y"]
 
-            # ev3.Sound.speak("X {} Y {} ".format(x,y)).wait()
-            print("X {} Y {} ".format(x,y))
-            self.knots[-1]["x_cord"] = self.knots[-2]["x_cord"] + x // 40 + ((x%40)*2) // 40    # relative x und y in Kord. umrechnen, dann draufaddieren,
-            self.knots[-1]["y_cord"] = self.knots[-2]["y_cord"] + y // 40 + ((y%40)*2) // 40    # sodass keine Folgefehler in der Kord. Bestimmung entstehen
+            print("rel X {} Y {} ".format(x_rel,y_rel))
 
-        cord_str = "{} {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])
+            x_cord = self.knots[-1]["x_cord"] + x_rel // 40 + ((x_rel%40)*2) // 40    # relative x und y in Kord. umrechnen, dann draufaddieren,
+            y_cord = self.knots[-1]["y_cord"] + y_rel // 40 + ((y_rel%40)*2) // 40    # sodass keine Folgefehler in der Kord. Bestimmung entstehen
+
+        cord_str = "{} {}".format(x_cord, y_cord)
         print("\n\nX, Y:", cord_str)
+
+
+        # Knoten bekannt?
 
         if cord_str in self.cords:
             known_knot = True
+            this_knot = self.cords.index(cord_str)
+
+            print("\nKnown Knot (", this_knot,")\n\n")
+            print("knots:", self.knots)
         else:
+            self.knots.append({})
+            self.knots[-1]["x_cord"] = x_cord
+            self.knots[-1]["y_cord"] = y_cord
+            self.knots[-1]["x"] = x
+            self.knots[-1]["y"] = y
+            self.knots[-1]["paths"] = []
+            self.knots[-1]["not_visited"] = []
+
             self.cords.append(cord_str)
             known_knot = False
+            this_knot = -1
+            print("\nNew Knot\n")
 
         # ev3.Sound.speak("X {} Y {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])).wait()
-        print(self.knots)
 
-
-
-        self.knots[-1]["paths"] = []
-        self.knots[-1]["not_visited"] = []
-        turns = 0
 
         # Enter
 
-        # ev3.Sound.speak("Enter at {} degrees".format(self.align_enter(math.degrees(self.odm.heading)))).wait()
         enter_at = self.deg_to_enter()
         enter_deg = math.degrees(self.odm.heading)
         enter_aligned = self.align_enter(enter_deg)
         print("\n\nEnter:", enter_deg,"\n")
         print("Enter aligned:", self.align_enter(enter_deg))
+        # ev3.Sound.speak("Enter at {} degrees".format(self.align_enter(math.degrees(self.odm.heading)))).wait()
 
 
 
@@ -229,66 +250,101 @@ class PID:
         turned = 0
         lpos = self.motors[0].position
 
-        self.motors[0].run_direct(duty_cycle_sp = 25)
-        self.motors[1].run_direct(duty_cycle_sp = -25)
 
 
-        # Kanten Scan
 
-        while turned < 330:
+        # Kanten Scan, falls neuer Knoten
 
-            turns += 1
+        if not known_knot:
 
-            while self.motors[0].position - lpos < 90 and turned < 330:
-                self.odm.update(self.motors[0].position, self.motors[1].position)
-                turned = math.degrees(self.odm.heading) - deg
-                print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
+            self.motors[0].run_direct(duty_cycle_sp = 25)
+            self.motors[1].run_direct(duty_cycle_sp = -25)
+
+            while turned < 330:
 
 
-            col = self.cs.bin_data("hhh")
-            while sum(col) > self.white-300 and turned < 330:
-                self.odm.update(self.motors[0].position, self.motors[1].position)
-                turned = math.degrees(self.odm.heading) - deg
+                while self.motors[0].position - lpos < 90 and turned < 330:
+                    self.odm.update(self.motors[0].position, self.motors[1].position)
+                    turned = math.degrees(self.odm.heading) - deg
+                    # print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
+
+
                 col = self.cs.bin_data("hhh")
-                print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos, "col", sum(col))
+                while sum(col) > self.white-300 and turned < 330:
+                    self.odm.update(self.motors[0].position, self.motors[1].position)
+                    turned = math.degrees(self.odm.heading) - deg
+                    col = self.cs.bin_data("hhh")
+                    # print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos, "col", sum(col))
 
 
-            lpos = self.motors[0].position
+                lpos = self.motors[0].position
 
-            print("path at", turned)
+                print("path at", turned)
 
-            if turned < 300:
-                abs_deg = enter_aligned + self.turn_to_real_deg(turned)
-                path_num = self.deg_to_pathnum(abs_deg)
+                if turned < 300:
+                    abs_deg = enter_aligned + self.turn_to_real_deg(turned)
+                    path_num = self.deg_to_pathnum(abs_deg)
 
-                print("   heading", math.degrees(self.odm.heading), "topathnum:", path_num)
-                print("aligned enter:", enter_aligned, "turn_to_real_deg:", self.turn_to_real_deg(turned))
+                    print("   heading", math.degrees(self.odm.heading), "topathnum:", path_num)
+                    print("aligned enter:", enter_aligned, "turn_to_real_deg:", self.turn_to_real_deg(turned))
 
-                if path_num != enter_at:
                     self.knots[-1]["not_visited"].append(path_num)
-                self.knots[-1]["paths"].append(path_num)
+                    self.knots[-1]["paths"].append(path_num)
 
 
         deg = math.degrees(self.odm.heading)
         lpos = self.motors[0].position
 
-        print("scan completed\n")
-        print(turned)
+        self.knots[this_knot]["not_visited"].remove(enter_at)
 
-        if len(self.knots[-1]["not_visited"]) == 0:
-            go_back = True
+        print("scan completed\n")
+        print("not_visited:", self.knots[this_knot]["not_visited"])
+
+        if self.go_back:
+            self.go_back = False
+            self.backtrack = True
+        elif len(self.knots[this_knot]["not_visited"]) == 0 and not self.backtrack:
+            self.go_back = True
         else:
-            go_back = False
+            self.go_back = False
+
+        if len(self.knots[this_knot]["not_visited"]) > 0: self.backtrack = False
+
+        print("len(not_visited):", len(self.knots[this_knot]["not_visited"]), "go_back:", self.go_back, "backtrack:", self.backtrack)
+        print(self.knots)
+
+
+        # Kanten finden
 
         turned = 0
 
-        if not go_straight:
-            for path in self.knots[-1]["paths"]:
+        if go_straight and self.deg_to_pathnum(enter_aligned) in self.knots[this_knot]["not_visited"]:     # Gradeaus möglich und noch nicht besucht
+
+            for m in self.motors: m.stop()
+            path_num = self.deg_to_pathnum(enter_aligned)
+            print("\n\nGoing straight")
+            print("Visiting", path_num, "enter_aligned:", enter_aligned)
+            # ev3.Sound.speak("Visiting {}".format(path_num)).wait()
+            self.knots[this_knot]["last_enter"] = enter_at
+            self.odm.reset(enter_aligned % 360)
+            self.motors[0].reset()
+            self.motors[1].reset()
+            self.knots[this_knot]["not_visited"].remove(path_num)
+
+
+            print("reset heading to:", enter_aligned % 360)
+            print("heading now:", math.degrees(self.odm.heading))
+        else:                                                                                       # Grade aus nicht möglich und/oder schon besucht
+
+            self.motors[0].run_direct(duty_cycle_sp = 25)
+            self.motors[1].run_direct(duty_cycle_sp = -25)
+
+            for path in self.knots[this_knot]["paths"]:
 
                 while self.motors[0].position - lpos < 90:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     turned = math.degrees(self.odm.heading) - deg
-                    print("turned: ", turned, "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
+                    # print("turned: ", turned, "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
 
                 # quit()
 
@@ -297,7 +353,7 @@ class PID:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     turned = math.degrees(self.odm.heading) - deg
                     col = self.cs.bin_data("hhh")
-                    print("turned: ", turned,  "heading:", math.degrees(self.odm.heading),  "lpos:", lpos, "col", sum(col))
+                    # print("turned: ", turned,  "heading:", math.degrees(self.odm.heading),  "lpos:", lpos, "col", sum(col))
 
                 print("\nheading:", math.degrees(self.odm.heading))
 
@@ -305,47 +361,98 @@ class PID:
                 abs_deg = enter_aligned + self.turn_to_real_deg(turned)
                 path_num = self.deg_to_pathnum(abs_deg)
 
-                print("  pathnum", path_num, "knots:", self.knots[-1]["not_visited"],"\n\n")
+                print("  pathnum", path_num, "knots:", self.knots[this_knot]["not_visited"],"\n\n")
                 print("entered at", enter_at," aligned:", enter_aligned, "path:", enter_at)
                 print("\nchecking ",enter_deg,"(", enter_aligned,") +",turned,"(",self.turn_to_real_deg(turned),") =", abs_deg," for pathnum\n")
                 print("pathnum is", path_num)
 
-                if path_num in self.knots[-1]["not_visited"] or (go_back and path_num == enter_at):      # Unbesuchter Pfad oder soll zurück
+                if path_num in self.knots[this_knot]["not_visited"] \
+                    or (self.go_back and path_num == enter_at) \
+                    or (self.backtrack and path_num == self.knots[this_knot]["last_enter"]):            # Unbesuchter Pfad oder soll zurück oder auf Rückweg
 
                     while self.motors[0].position - lpos < 25:                                           # Stück weiterfahren um rechts an Linie zu sein
                         self.odm.update(self.motors[0].position, self.motors[1].position)
-                        print("going further...",turned)
+                        # print("going further...",turned)
                     for m in self.motors: m.stop()
                     print("Visiting", path_num)
                     # ev3.Sound.speak("Visiting {}".format(path_num))
+                    self.knots[this_knot]["last_enter"] = enter_at
                     self.odm.reset(abs_deg % 360)                                                        # Knoten ansteuern und aus not_visited löschen
                     self.motors[0].reset()
                     self.motors[1].reset()
-                    self.knots[-1]["not_visited"].remove(path_num)
+                    if path_num in self.knots[this_knot]["not_visited"]:
+                        self.knots[this_knot]["not_visited"].remove(path_num)
 
 
                     print("reset heading to:", abs_deg % 360)
                     print("heading now:", math.degrees(self.odm.heading))
                     break
-        else:
 
-            # Gradeaus
 
-            for m in self.motors: m.stop()
-            path_num = self.deg_to_pathnum(enter_aligned)
-            print("\n\nGoing straight")
-            print("Visiting", path_num, "enter_aligned:", enter_aligned)
-            # ev3.Sound.speak("Visiting {}".format(path_num)).wait()
-            self.odm.reset(enter_aligned % 360)
-            self.motors[0].reset()
-            self.motors[1].reset()
+        # if not go_straight:
+        #     for path in self.knots[-1]["paths"]:
+        #
+        #         while self.motors[0].position - lpos < 90:
+        #             self.odm.update(self.motors[0].position, self.motors[1].position)
+        #             turned = math.degrees(self.odm.heading) - deg
+        #             print("turned: ", turned, "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
+        #
+        #         # quit()
+        #
+        #         col = self.cs.bin_data("hhh")
+        #         while sum(col) > self.white-300:
+        #             self.odm.update(self.motors[0].position, self.motors[1].position)
+        #             turned = math.degrees(self.odm.heading) - deg
+        #             col = self.cs.bin_data("hhh")
+        #             print("turned: ", turned,  "heading:", math.degrees(self.odm.heading),  "lpos:", lpos, "col", sum(col))
+        #
+        #         print("\nheading:", math.degrees(self.odm.heading))
+        #
+        #         lpos = self.motors[0].position
+        #         abs_deg = enter_aligned + self.turn_to_real_deg(turned)
+        #         path_num = self.deg_to_pathnum(abs_deg)
+        #
+        #         print("  pathnum", path_num, "knots:", self.knots[-1]["not_visited"],"\n\n")
+        #         print("entered at", enter_at," aligned:", enter_aligned, "path:", enter_at)
+        #         print("\nchecking ",enter_deg,"(", enter_aligned,") +",turned,"(",self.turn_to_real_deg(turned),") =", abs_deg," for pathnum\n")
+        #         print("pathnum is", path_num)
+        #
+        #         if path_num in self.knots[-1]["not_visited"] or (go_back and path_num == enter_at):      # Unbesuchter Pfad oder soll zurück
+        #
+        #             while self.motors[0].position - lpos < 25:                                           # Stück weiterfahren um rechts an Linie zu sein
+        #                 self.odm.update(self.motors[0].position, self.motors[1].position)
+        #                 print("going further...",turned)
+        #             for m in self.motors: m.stop()
+        #             print("Visiting", path_num)
+        #             # ev3.Sound.speak("Visiting {}".format(path_num))
+        #             self.odm.reset(abs_deg % 360)                                                        # Knoten ansteuern und aus not_visited löschen
+        #             self.motors[0].reset()
+        #             self.motors[1].reset()
+        #             self.knots[-1]["not_visited"].remove(path_num)
+        #
+        #
+        #             print("reset heading to:", abs_deg % 360)
+        #             print("heading now:", math.degrees(self.odm.heading))
+        #             break
+        # else:
+        #
+        #     # Gradeaus
+        #
+        #     for m in self.motors: m.stop()
+        #     path_num = self.deg_to_pathnum(enter_aligned)
+        #     print("\n\nGoing straight")
+        #     print("Visiting", path_num, "enter_aligned:", enter_aligned)
+        #     # ev3.Sound.speak("Visiting {}".format(path_num)).wait()
+        #     self.odm.reset(enter_aligned % 360)
+        #     self.motors[0].reset()
+        #     self.motors[1].reset()
+        #
+        #     print("reset heading to:", enter_aligned % 360)
+        #     print("heading now:", math.degrees(self.odm.heading))
 
-            print("reset heading to:", enter_aligned % 360)
-            print("heading now:", math.degrees(self.odm.heading))
 
-        print(turned)
 
-        print(self.knots[-1]["not_visited"])
+        print("Not Visited:", self.knots[this_knot]["not_visited"])
         self.follow()
         quit()
 
