@@ -24,7 +24,7 @@ class odometry:
     def reset(self, heading):
         self.displacement = 0
         self.rotation = 0
-        self.heading = heading
+        self.heading = math.radians(heading)
         self.l_count = 0
         self.r_count = 0
         self.l_prevc = 0

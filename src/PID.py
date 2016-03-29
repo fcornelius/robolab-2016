@@ -13,8 +13,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        self.black = 101
-        self.white = 838
+        self.black = 97
+        self.white = 888
 
         self.err = 0
         self.mid = 0
@@ -29,6 +29,7 @@ class PID:
         self.odm = odometer.odometry()
 
         self.knots = []
+        self.cords = []
         self.follow()
 
 
@@ -102,10 +103,10 @@ class PID:
             self.motors[1].duty_cycle_sp = self.start_power + r_turn
 
 
-            print("Error: {:7.2f}   l_turn: {:5.2f}   r_turn: {:5.2f}   l: {:5.2f}   r: {:5.2f}   posX: {:6.3f}   posY: {:6.3f}   heading: {:6.2f}   l_change: {:6.2f}   r_change: {:6.2f}   rotation: {:6.2f}   displacement: {:6.2f} heading_deg: {:6.2f} l pos: {:6.2f} r pos: {:6.2f}"
-                  .format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp,
-                          self.odm.pos_x, self.odm.pos_y, self.odm.heading, self.odm.l_count, self.odm.r_count,
-                          self.odm.rotation, self.odm.displacement, math.degrees(self.odm.heading), self.motors[0].position, self.motors[1].position))
+            # print("Error: {:7.2f}   l_turn: {:5.2f}   r_turn: {:5.2f}   l: {:5.2f}   r: {:5.2f}   posX: {:6.3f}   posY: {:6.3f}   heading: {:6.2f}   l_change: {:6.2f}   r_change: {:6.2f}   rotation: {:6.2f}   displacement: {:6.2f} heading_deg: {:6.2f} l pos: {:6.2f} r pos: {:6.2f}"
+            #       .format(error,l_turn,r_turn,self.motors[0].duty_cycle_sp, self.motors[1].duty_cycle_sp,
+            #               self.odm.pos_x, self.odm.pos_y, self.odm.heading, self.odm.l_count, self.odm.r_count,
+            #               self.odm.rotation, self.odm.displacement, math.degrees(self.odm.heading), self.motors[0].position, self.motors[1].position))
 
             last_err = error
 
@@ -126,9 +127,9 @@ class PID:
 
         # ev3.Sound.speak("left {} right {}".format(self.motors[0].duty_cycle_sp,self.motors[1].duty_cycle_sp)).wait()
 
-        # Rotausgleich
+        #Rotausgleich
         c = self.motors[0].duty_cycle_sp - self.motors[1].duty_cycle_sp
-        self.motors[1].run_to_rel_pos(position_sp=1.5 * c, duty_cycle_sp = 15)
+        self.motors[1].run_to_rel_pos(position_sp=0.7 * c, duty_cycle_sp = 15)
 
         while self.motors[1].speed > 0:
             self.odm.update(self.motors[0].position, self.motors[1].position)
@@ -180,6 +181,15 @@ class PID:
             self.knots[-1]["x_cord"] = self.knots[-2]["x_cord"] + x // 40 + ((x%40)*2) // 40    # relative x und y in Kord. umrechnen, dann draufaddieren,
             self.knots[-1]["y_cord"] = self.knots[-2]["y_cord"] + y // 40 + ((y%40)*2) // 40    # sodass keine Folgefehler in der Kord. Bestimmung entstehen
 
+        cord_str = "{} {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])
+        print("\n\nX, Y:", cord_str)
+
+        if cord_str in self.cords:
+            known_knot = True
+        else:
+            self.cords.append(cord_str)
+            known_knot = False
+
         # ev3.Sound.speak("X {} Y {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])).wait()
         print(self.knots)
 
@@ -191,10 +201,12 @@ class PID:
 
         # Enter
 
-        # ev3.Sound.speak("Enter at {}".format(self.deg_to_enter())).wait()
+        # ev3.Sound.speak("Enter at {} degrees".format(self.align_enter(math.degrees(self.odm.heading)))).wait()
         enter_at = self.deg_to_enter()
         enter_deg = math.degrees(self.odm.heading)
+        enter_aligned = self.align_enter(enter_deg)
         print("\n\nEnter:", enter_deg,"\n")
+        print("Enter aligned:", self.align_enter(enter_deg))
 
 
 
@@ -221,7 +233,7 @@ class PID:
         self.motors[1].run_direct(duty_cycle_sp = -25)
 
 
-
+        # Kanten Scan
 
         while turned < 330:
 
@@ -232,7 +244,6 @@ class PID:
                 turned = math.degrees(self.odm.heading) - deg
                 print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos)
 
-            # quit()
 
             col = self.cs.bin_data("hhh")
             while sum(col) > self.white-300 and turned < 330:
@@ -241,18 +252,21 @@ class PID:
                 col = self.cs.bin_data("hhh")
                 print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos, "col", sum(col))
 
-            # ev3.Sound.beep()
 
             lpos = self.motors[0].position
 
             print("path at", turned)
 
             if turned < 300:
-                print("   heading", math.degrees(self.odm.heading), "topathnum:", self.deg_to_pathnum())
+                abs_deg = enter_aligned + self.turn_to_real_deg(turned)
+                path_num = self.deg_to_pathnum(abs_deg)
 
-                if self.deg_to_pathnum() != enter_at:
-                    self.knots[-1]["not_visited"].append(self.deg_to_pathnum())
-                self.knots[-1]["paths"].append(self.deg_to_pathnum())
+                print("   heading", math.degrees(self.odm.heading), "topathnum:", path_num)
+                print("aligned enter:", enter_aligned, "turn_to_real_deg:", self.turn_to_real_deg(turned))
+
+                if path_num != enter_at:
+                    self.knots[-1]["not_visited"].append(path_num)
+                self.knots[-1]["paths"].append(path_num)
 
 
         deg = math.degrees(self.odm.heading)
@@ -260,7 +274,11 @@ class PID:
 
         print("scan completed\n")
         print(turned)
-        # quit()
+
+        if len(self.knots[-1]["not_visited"]) == 0:
+            go_back = True
+        else:
+            go_back = False
 
         turned = 0
 
@@ -281,37 +299,49 @@ class PID:
                     col = self.cs.bin_data("hhh")
                     print("turned: ", turned,  "heading:", math.degrees(self.odm.heading),  "lpos:", lpos, "col", sum(col))
 
-                # print(self.deg_to_pathnum())
                 print("\nheading:", math.degrees(self.odm.heading))
 
                 lpos = self.motors[0].position
-                print("  pathnum", self.deg_to_pathnum(), "knots:", self.knots[-1]["not_visited"],"\n\n")
-                print("\nchecking ",enter_deg,"+",turned,"(",self.turn_to_real_deg(turned),") =", enter_deg+self.turn_to_real_deg(turned)," for pathnum\n")
+                abs_deg = enter_aligned + self.turn_to_real_deg(turned)
+                path_num = self.deg_to_pathnum(abs_deg)
 
-                if self.deg_to_pathnum() in self.knots[-1]["not_visited"]:
-                    while self.motors[0].position - lpos < 25:
+                print("  pathnum", path_num, "knots:", self.knots[-1]["not_visited"],"\n\n")
+                print("entered at", enter_at," aligned:", enter_aligned, "path:", enter_at)
+                print("\nchecking ",enter_deg,"(", enter_aligned,") +",turned,"(",self.turn_to_real_deg(turned),") =", abs_deg," for pathnum\n")
+                print("pathnum is", path_num)
+
+                if path_num in self.knots[-1]["not_visited"] or (go_back and path_num == enter_at):      # Unbesuchter Pfad oder soll zurück
+
+                    while self.motors[0].position - lpos < 25:                                           # Stück weiterfahren um rechts an Linie zu sein
                         self.odm.update(self.motors[0].position, self.motors[1].position)
                         print("going further...",turned)
                     for m in self.motors: m.stop()
-                    print("Visiting", self.deg_to_pathnum())
-                    ev3.Sound.speak("Visiting {}".format(self.deg_to_pathnum()))
-                    self.odm.reset(self.pathnum_to_rad(self.deg_to_pathnum()))
+                    print("Visiting", path_num)
+                    # ev3.Sound.speak("Visiting {}".format(path_num))
+                    self.odm.reset(abs_deg % 360)                                                        # Knoten ansteuern und aus not_visited löschen
                     self.motors[0].reset()
                     self.motors[1].reset()
+                    self.knots[-1]["not_visited"].remove(path_num)
 
-                    print("reset heading to:", self.pathnum_to_rad(self.deg_to_pathnum()))
-                    print("heading now:", self.odm.heading)
+
+                    print("reset heading to:", abs_deg % 360)
+                    print("heading now:", math.degrees(self.odm.heading))
                     break
         else:
+
+            # Gradeaus
+
             for m in self.motors: m.stop()
-            print("Visiting", self.deg_to_pathnum())
-            ev3.Sound.speak("Visiting {}".format(self.deg_to_pathnum())).wait()
-            self.odm.reset(self.pathnum_to_rad(self.deg_to_pathnum()))
+            path_num = self.deg_to_pathnum(enter_aligned)
+            print("\n\nGoing straight")
+            print("Visiting", path_num, "enter_aligned:", enter_aligned)
+            # ev3.Sound.speak("Visiting {}".format(path_num)).wait()
+            self.odm.reset(enter_aligned % 360)
             self.motors[0].reset()
             self.motors[1].reset()
 
-            print("reset heading to:", self.pathnum_to_rad(self.deg_to_pathnum()))
-            print("heading now:", self.odm.heading)
+            print("reset heading to:", enter_aligned % 360)
+            print("heading now:", math.degrees(self.odm.heading))
 
         print(turned)
 
@@ -341,19 +371,19 @@ class PID:
 
 
 
-    def deg_to_pathnum(self):
+    def deg_to_pathnum(self, deg = None):
 
-        deg = math.degrees(self.odm.heading)
+        if deg == None: deg = math.degrees(self.odm.heading)
 
         if -30 < deg%360 < 55 or -20 < deg < 55:
             return 1
-        elif 55 < deg%360 < 140:
+        elif 55 < deg%360 < 145:
             return 2
-        elif 140 < deg%360 < 230:
+        elif 145 < deg%360 < 235:
             return 3
-        elif 180 < deg%360 < 270:
+        elif 235 < deg%360 < 325:
             return 4
-        elif 270 < deg%360 < 380:
+        elif 325 < deg%360 < 359:
             return 1
 
     def deg_to_enter(self):
@@ -382,15 +412,39 @@ class PID:
 
         return math.radians(deg)
 
+
     def turn_to_real_deg(self, turn):
         deg = 0
 
         if 40 < turn < 120:
             deg = 90
-        elif 120 < deg < 200:
+        elif 120 < turn < 200:
             deg = 180
-        elif 200 < deg < 290:
+        elif 200 < turn < 290:
             deg = 270
+
+        return deg
+
+    def align_enter(self, enter):
+        deg = 0
+        enter %= 360
+
+        if -20 < enter < 20 or 340 < enter < 359:
+            deg = 0
+        elif 20 < enter < 65:
+            deg = 45
+        elif 65 < enter < 110:
+            deg = 90
+        elif 110 < enter < 155:
+            deg = 135
+        elif 155 < enter < 200:
+            deg = 180
+        elif 200 < enter < 245:
+            deg = -135
+        elif 245 < enter < 290:
+            deg = -90
+        elif 290 < enter < 330:
+            deg = -45
 
         return deg
 
