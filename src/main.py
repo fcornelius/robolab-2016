@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
-import ev3dev.ev3 as ev3
+import time
+from PID import *
+from com import *
 # test
 
 def main():
-    print("main.py started.")
+    # com = communication('121', 'ydpGX5bMNY', 'felixalex')
+    # print("Conecting")
+    # com.connect()
 
-    motors = [ev3.LargeMotor(port) for port in ('outB', 'outC')]
+    # time.sleep(10)
+    pid = PID()
+    pid.follow()
+
 if __name__ == "__main__":
     main()

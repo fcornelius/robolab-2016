@@ -4,8 +4,7 @@ import ev3dev.ev3 as ev3
 import time
 import math
 import odometry as odometer
-from pprint import pprint
-import os
+import com as mqtt
 
 class PID:
     def __init__(self):
@@ -15,8 +14,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        self.black = 118
-        self.white = 838
+        self.black = 100
+        self.white = 781
 
         self.err = 0
         self.mid = 0
@@ -26,9 +25,13 @@ class PID:
         self.start_power = 26
         self.power_offset = -5
 
+        # self.init_mqtt()
         self.init_comp()
         self.calibrate(self.cs)
         self.odm = odometer.odometry()
+
+        self.start_x = 0
+        self.start_y = 0
 
         self.saved_position = {"x": 0, "y": 0}
         self.knots = []
@@ -37,11 +40,14 @@ class PID:
         self.backtrack = False
         self.backtrack_path = []
 
-        self.follow()
 
 
 
 
+
+    def init_mqtt(self):
+        com = mqtt.communication('121', 'ydpGX5bMNY', 'felixalex')
+        com.publish('explorer/121', 'ready Wasp')
 
     def init_comp(self):
         self.motors = [ev3.LargeMotor(port) for port in ['outB', 'outC']]
@@ -182,11 +188,14 @@ class PID:
 
         if len(self.knots) == 0:
 
-            # x_cord = x // 40 + ((x%40)*2) // 40
-            # y_cord = y // 40 + ((y%40)*2) // 40
+            # Erster Knoten
 
-            x_cord = 0
-            y_cord = 0
+
+
+            x_cord = self.start_x
+            y_cord = self.start_y
+
+            print("Starting at", x_cord, y_cord)
             x = 0
             y = 0
             self.odm.pos_x = 0
@@ -345,12 +354,15 @@ class PID:
         if known_knot and not self.backtrack:                                                                            #  1. Erreichen eines bekannten Knotens auf der Suche
             self.backtrack = True                                                                                        #
             print("Setting backtrack to", self.backtrack)                                                                #
-        elif known_knot and self.backtrack and len(self.knots[this_knot]["not_visited"]) == 0:                           #  2. Nach Backracking zu bekannten Knoten zurückkommen
+        elif known_knot and self.backtrack and len(self.knots[this_knot]["not_visited"]) == 0:                           #  2. Nach Backtracking zu bekannten Knoten zurückkommen
             self.backtrack = True                                                                                        #    und Backtracking fortsetzen, da keine unentdeckten Kanten
             print("Setting backtrack to", self.backtrack)                                                                #
         elif known_knot and self.backtrack and len(self.knots[this_knot]["not_visited"]) > 0:                            #  3. Nach Backtracking zu bekannten Knoten zurückkommen
             self.backtrack = False                                                                                       #    und Backtracking fortsetzen, da keine unentdeckten Kanten
             print("Setting backtrack to", self.backtrack)                                                                #    und Backtracking beenden, weil es noch unentdeckte Kanten gibt
+        elif not known_knot and len(self.knots[this_knot]["not_visited"]) == 0:
+            self.backtrack = True                                                                                        #    und Backtracking fortsetzen, da keine unentdeckten Kanten
+            print("Setting backtrack to", self.backtrack)
 
 
         print("\n\nlen(not_visited):", len(self.knots[this_knot]["not_visited"]), "backtrack:", self.backtrack)
@@ -610,5 +622,3 @@ class PID:
 
 
 
-
-pid = PID()
