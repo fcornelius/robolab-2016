@@ -8,8 +8,10 @@ class odometry:
     def __init__(self):
         self.pos_x = 0
         self.pos_y = 0
-        self.diameter = 5.6
-        self.track = 11.8
+        # self.diameter = 5.6
+        self.diameter = 3
+        # self.track = 11.8
+        self.track = 12.45
         self.scale_factor = math.pi * (self.diameter/360)
         self.displacement = 0
         self.rotation = 0
