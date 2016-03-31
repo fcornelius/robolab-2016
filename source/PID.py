@@ -4,6 +4,7 @@ import ev3dev.ev3 as ev3
 import time
 import math
 import odometry as odometer
+from pprint import pprint
 # import com as mqtt
 
 class PID:
@@ -36,6 +37,8 @@ class PID:
         self.saved_position = {"x": 0, "y": 0}
         self.knots = []
         self.cords = []
+        self.map = {}
+        self.last_leave = 0
         self.go_back = False
         self.backtrack = False
         self.backtrack_path = []
@@ -131,7 +134,7 @@ class PID:
         print("\n\n\n--------------------------------------------\n")
         x = math.floor(self.odm.pos_x)
         y = math.floor(self.odm.pos_y)
-        print("Absolute pos:",x, y)
+        # print("Absolute pos:",x, y)
 
         # Weiter vorfahren:
 
@@ -170,7 +173,7 @@ class PID:
 
 
 
-        print("\n\nThis: X:", math.floor(self.odm.pos_x), "Y:", math.floor(self.odm.pos_y))
+        # print("\n\nThis: X:", math.floor(self.odm.pos_x), "Y:", math.floor(self.odm.pos_y))
 
         # Knoten kord. speichern
 
@@ -181,14 +184,12 @@ class PID:
 
 
 
-        print("len knots: ", len(self.knots))
-
+        # print("len knots: ", len(self.knots))
+        last_knot = 0
 
         if len(self.knots) == 0:
 
             # Erster Knoten
-
-
 
             x_cord = self.start_x
             y_cord = self.start_y
@@ -198,12 +199,13 @@ class PID:
             y = 0
             self.odm.pos_x = 0
             self.odm.pos_y = 0
+            self.map["{} {}".format(x_cord, y_cord)] = {}
 
         else:
             x_rel = x - self.saved_position["x"]  # relative x und y zum vorigen Knoten
             y_rel = y - self.saved_position["y"]
 
-            print("rel X {} Y {} ".format(x_rel,y_rel))
+            print("\nRel: X {} Y {} \n".format(x_rel,y_rel))
 
             last_knot = self.cords.index(self.backtrack_path[-1])
             print("Last_Knot: ", self.knots[last_knot]["x_cord"], self.knots[last_knot]["y_cord"])
@@ -224,6 +226,8 @@ class PID:
             self.backtrack_path.append(cord_str)                                    # Dem Pfad hinzufügen
             print("Added", cord_str, "to Backtrack Path")
             print("Backtrack Path is", self.backtrack_path)
+
+
 
         print("\n\nX, Y:", cord_str)
 
@@ -267,25 +271,26 @@ class PID:
         enter_aligned = self.align_enter(enter_deg)
         enter_at = self.deg_to_enter(enter_aligned)
 
+        print("\n\nEnter:", enter_deg,"\n")
+        print("Enter aligned:", self.align_enter(enter_deg),"\n")
+
         if not self.backtrack: self.knots[this_knot]["last_enter"] = enter_at
         print("Last enter:", self.knots[this_knot]["last_enter"])
 
-        print("\n\nEnter:", enter_deg,"\n")
-        print("Enter aligned:", self.align_enter(enter_deg),"\n")
-        # ev3.Sound.speak("Enter at {} degrees".format(self.align_enter(math.degrees(self.odm.heading)))).wait()
+
+        # Breitensuche Karte
 
 
+        if not self.backtrack and len(self.knots) > 1:
 
-        # gradeaus checken:
+            last_cord = self.cords[last_knot]
+            print("last cord:", last_cord)                                          # Verbindung Letzter -> Dieser
+            self.map[last_cord][self.last_leave] = cord_str
 
-        # col = self.cs.bin_data("hhh")
-        # if sum(col) < self.white-100 and not known_knot:
-        #     self.knots[this_knot]["not_visited"].append(self.deg_to_pathnum())
-        #     self.knots[this_knot]["paths"].append(self.deg_to_pathnum())
-        #     go_straight = True
-        # else:
-        #     go_straight = False
 
+            if not cord_str in self.map:                                            # Verbindung Dieser -> Letzter
+                self.map[cord_str] = {}
+            self.map[cord_str][enter_at] = last_cord
 
 
         # Drehen:
@@ -295,7 +300,7 @@ class PID:
         lpos = self.motors[0].position
 
 
-        print("Deg before turn:", deg)
+        # print("Deg before turn:", deg)
 
         self.motors[0].run_direct(duty_cycle_sp = -35)
         self.motors[1].run_direct(duty_cycle_sp = 35)
@@ -303,8 +308,8 @@ class PID:
         while turned > -30:
             self.odm.update(self.motors[0].position, self.motors[1].position)
             turned = math.degrees(self.odm.heading) - deg
-        print("turned:  ", turned)
-        print("deg: ", math.degrees(self.odm.heading))
+        # print("turned:  ", turned)
+        # print("deg: ", math.degrees(self.odm.heading))
 
         deg = math.degrees(self.odm.heading)
 
@@ -315,20 +320,15 @@ class PID:
         if not known_knot:
 
 
-
             self.motors[0].run_direct(duty_cycle_sp = 35)
             self.motors[1].run_direct(duty_cycle_sp = -35)
-
-
-
-
 
             while turned < 355:
 
 
 
                 col = self.cs.bin_data("hhh")
-                while sum(col) > self.white-500 and turned < 355:
+                while sum(col) > self.white-300 and turned < 355:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     turned = math.degrees(self.odm.heading) - deg
                     col = self.cs.bin_data("hhh")
@@ -342,11 +342,11 @@ class PID:
 
                 if turned < 335:
 
-                    print("path at", turned-30)
+
                     abs_deg = enter_aligned + self.turn_to_real_deg(turned-30)
                     path_num = self.deg_to_pathnum(abs_deg)
 
-                    print("Path found. Relative (real_deg):", self.turn_to_real_deg(turned-30), "Absolute Degrees:", abs_deg, "-> Adding Path", path_num)
+                    print("Path found. Turned:", turned-30, "to real:", self.turn_to_real_deg(turned-30), "Absolute Degrees:", abs_deg, "-> Adding Path", path_num)
 
                     if path_num not in self.knots[this_knot]["paths"]:
                         self.knots[this_knot]["not_visited"].append(path_num)
@@ -378,7 +378,7 @@ class PID:
         print("\n\nScan completed.")
         print("Not_visited:", self.knots[this_knot]["not_visited"])
 
-        print("backtrack is", self.backtrack)
+        # print("backtrack is", self.backtrack)
 
 
                                                                                                                          #  3 Fälle relevant:
@@ -397,8 +397,8 @@ class PID:
             print("Setting backtrack to", self.backtrack)
 
 
-        print("\n\nlen(not_visited):", len(self.knots[this_knot]["not_visited"]), "backtrack:", self.backtrack)
-        print("Knots:")
+        # print("\n\nlen(not_visited):", len(self.knots[this_knot]["not_visited"]), "backtrack:", self.backtrack)
+        # print("Knots:")
         for k in self.knots: print(self.knots.index(k), ": ", k)
 
 
@@ -410,10 +410,6 @@ class PID:
         self.motors[0].run_direct(duty_cycle_sp = 35)
         self.motors[1].run_direct(duty_cycle_sp = -35)
         turned = 0
-
-
-
-
 
 
         for path in self.knots[this_knot]["paths"]:
@@ -458,6 +454,7 @@ class PID:
                 self.motors[1].reset()
                 self.saved_position["x"] = x
                 self.saved_position["y"] = y
+                self.last_leave = path_num
                 if path_num in self.knots[this_knot]["not_visited"]:
                     self.knots[this_knot]["not_visited"].remove(path_num)
 
@@ -465,6 +462,9 @@ class PID:
                 print("reset heading to:", abs_deg % 360, "+", 20, "=", abs_deg % 360 + 10)
                 print("heading now:", math.degrees(self.odm.heading))
                 print("saved position:", self.saved_position["x"], self.saved_position["y"])
+                print("Map:")
+                pprint(self.map)
+                print("\n\n")
 
                 break
 
@@ -482,14 +482,9 @@ class PID:
 
 
 
-        print("Not Visited:", self.knots[this_knot]["not_visited"])
+        # print("Not Visited:", self.knots[this_knot]["not_visited"])
         self.follow()
         quit()
-
-
-
-
-
 
 
         # for m in self.motors:
