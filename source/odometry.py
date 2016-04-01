@@ -56,8 +56,8 @@ class odometry:
         self.displacement = (self.l_count + self.r_count) * self.scale_factor/2
         self.rotation = (self.l_count - self.r_count)  * self.scale_factor/self.track
 
-        self.pos_x += self.displacement * math.cos(self.heading + self.rotation / 2)
-        self.pos_y += self.displacement * math.sin(self.heading + self.rotation / 2)
+        self.pos_y += self.displacement * math.cos(self.heading + self.rotation / 2)
+        self.pos_x += self.displacement * math.sin(self.heading + self.rotation / 2)
         self.heading += self.rotation
 
         # print("heading (deg):", math.degrees(self.heading), "heading: ", self.heading, "rotation:", self.rotation, "displacement:", self.displacement)

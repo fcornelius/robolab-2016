@@ -15,8 +15,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        # self.black = 93
-        # self.white = 694
+        self.black = 95
+        self.white = 645
 
         self.err = 0
         self.mid = 0
@@ -31,8 +31,8 @@ class PID:
         self.calibrate(self.cs)
         self.odm = odometer.odometry()
 
-        self.start_x = 0
-        self.start_y = 0
+        self.start_x = -1
+        self.start_y = -1
 
         self.saved_position = {"x": 0, "y": 0}
         self.knots = []
@@ -43,10 +43,39 @@ class PID:
         self.backtrack = False
         self.backtrack_path = []
 
+        self.com = None
 
 
 
 
+    def set_start(self,x,y):
+        print("Set Start:",x,y)
+        self.start_x = x
+        self.start_y = y
+        print("Setting start to", self.start_x, self.start_y)
+
+    def add_path(self, path_str):
+        path = path_str.split(' ')
+        start_cord = ' '.join(path[1:3])
+        start_leave = int(path[3])
+        end_cord = ' '.join(path[4:6])
+        end_enter = int(path[6])
+
+        if not start_cord in self.map:
+            self.map[start_cord] = {}
+        if not end_cord in self.map:
+            self.map[end_cord] = {}
+
+        self.map[start_cord][start_leave] = end_cord
+        self.map[end_cord][end_enter] = start_cord
+
+        print("Updated Map.\nMap now:")
+        pprint(self.map)
+
+    def send_path(self, cord_last, last_leave, cord_this, enter):
+        path_str = "{} {} {} {}".format(cord_last, last_leave, cord_this, enter)
+        print("\n\nSend Path: '{}'\n\n".format(path_str))
+        self.com.send_path(path_str)
 
     def init_mqtt(self):
         com = mqtt.communication('121', 'ydpGX5bMNY', 'felixalex')
@@ -191,8 +220,8 @@ class PID:
 
             # Erster Knoten
 
-            x_cord = self.start_x
-            y_cord = self.start_y
+            x_cord = int(self.start_x)
+            y_cord = int(self.start_y)
 
             print("Starting at", x_cord, y_cord)
             x = 0
@@ -261,7 +290,6 @@ class PID:
             this_knot = -1
             print("\nNew Knot\n")
 
-        # ev3.Sound.speak("X {} Y {}".format(self.knots[-1]["x_cord"], self.knots[-1]["y_cord"])).wait()
 
 
         # Enter
@@ -276,6 +304,13 @@ class PID:
 
         if not self.backtrack: self.knots[this_knot]["last_enter"] = enter_at
         print("Last enter:", self.knots[this_knot]["last_enter"])
+
+
+        # Pfad senden:
+
+        if len(self.knots) > 1:
+            self.send_path(self.cords[last_knot], self.last_leave, cord_str, enter_at)
+            time.sleep(2)
 
 
         # Breitensuche Karte
@@ -431,7 +466,7 @@ class PID:
 
 
 
-            if (path_num in self.knots[this_knot]["not_visited"] and not self.backtrack) \
+            if (len(self.knots[this_knot]["not_visited"]) > 0 and path_num == min(self.knots[this_knot]["not_visited"]) and not self.backtrack) \
                 or (self.backtrack and path_num == self.knots[this_knot]["last_enter"]):            # Unbesuchter Pfad oder soll zurück oder auf Rückweg
 
                 if self.backtrack:
