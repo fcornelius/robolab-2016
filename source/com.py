@@ -18,7 +18,7 @@ class communication:
         self.client.connect('stream-006.inf.tu-dresden.de', port=8883)
         self.client.subscribe('explorer/121', qos=1) # subscribe to topic explorer/001
         print("subscribed to explorer")
-        self.publish('explorer/121', 'ready Gliese')
+        # self.publish('explorer/121', 'ready Gliese')
         self.client.loop_start()
 
 
@@ -35,11 +35,20 @@ class communication:
     def received(self, client, data, message):
         payload = message.payload.decode('utf-8')
         print("\nGot Messagage '{}', topic was '{}'".format(payload, message.topic))
+
         if payload.split(' ')[0] == 'path':
-            self.main.add_path(payload)
+            path = payload.split(' ')
+            start_cord = ' '.join(path[1:3])
+            start_leave = int(path[3])
+            end_cord = ' '.join(path[4:6])
+            end_enter = int(path[6])
+            self.main.add_path(start_cord, start_leave, end_cord, end_enter)
 
         elif payload.split(' ')[0] == 'target':
-            pass
+            target = payload.split(' ')
+            target_cord = ' '.join(target[1:3])
+            self.main.set_target(target_cord)
+
         elif len(payload.split(' ')) == 3 and message.topic == 'explorer/121':
             planet = payload.split()[0]
             x = payload.split()[1]
