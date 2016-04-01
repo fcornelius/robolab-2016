@@ -11,7 +11,7 @@ class odometry:
         # self.diameter = 5.6
         self.diameter = 3
         # self.track = 11.8
-        self.track = 12.45
+        self.track = 11
         self.scale_factor = math.pi * (self.diameter/360)
         self.displacement = 0
         self.rotation = 0
@@ -56,8 +56,8 @@ class odometry:
         self.displacement = (self.l_count + self.r_count) * self.scale_factor/2
         self.rotation = (self.l_count - self.r_count)  * self.scale_factor/self.track
 
-        self.pos_x += self.displacement * math.cos(self.heading + self.rotation / 2)
-        self.pos_y += self.displacement * math.sin(self.heading + self.rotation / 2)
+        self.pos_y += self.displacement * math.cos(self.heading + self.rotation / 2)
+        self.pos_x += self.displacement * math.sin(self.heading + self.rotation / 2)
         self.heading += self.rotation
 
         # print("heading (deg):", math.degrees(self.heading), "heading: ", self.heading, "rotation:", self.rotation, "displacement:", self.displacement)
