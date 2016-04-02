@@ -18,7 +18,7 @@ class communication:
         self.client.connect('stream-006.inf.tu-dresden.de', port=8883)
         self.client.subscribe('explorer/121', qos=1) # subscribe to topic explorer/001
         print("subscribed to explorer")
-        # self.publish('explorer/121', 'ready Gliese')
+        self.publish('explorer/121', 'ready Wasp')
         self.client.loop_start()
 
 
