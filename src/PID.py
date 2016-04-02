@@ -151,6 +151,23 @@ class PID:
         self.com.send_path(path_str)
 
 
+    def wait_for_cs(self, l_duty, r_duty):
+        for m in self.motors: m.stop()
+        print("Color sensor failure. Waiting...")
+        col = self.cs.bin_data("hhh")
+        while sum(col) == 0:
+            print("waiting")
+            time.sleep(1)
+            col = self.cs.bin_data("hhh")
+        time.sleep(1)
+        col = self.cs.bin_data("hhh")
+        while sum(col) == 0:
+            time.sleep(1)
+            col = self.cs.bin_data("hhh")
+        print("Color Sensor working.")
+        self.motors[0].run_direct(duty_cycle_sp = l_duty)
+        self.motors[1].run_direct(duty_cycle_sp = r_duty)
+
 
     def follow(self):
 
@@ -167,6 +184,9 @@ class PID:
 
         while True:
             col = self.cs.bin_data("hhh")
+            if sum(col) == 0:
+                self.wait_for_cs(self.start_power,self.start_power)
+
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
             if col[0] > col[1] + col[2]:   # Rot erkannt
@@ -229,6 +249,9 @@ class PID:
 
         while col[0] > col[1] + col[2]:
             col = self.cs.bin_data("hhh")
+            if sum(col) == 0:
+                self.wait_for_cs(30,30)
+
             self.odm.update(self.motors[0].position, self.motors[1].position)
 
         lpos = self.motors[0].position
@@ -400,9 +423,9 @@ class PID:
 
         for m in self.motors: m.stop()
 
-        # Kanten Scan, falls neuer Knoten oder nicht zum Weg geführt
+        # Kanten Scan, falls neuer Knoten
 
-        if not known_knot and not self.navigate:
+        if not known_knot:
 
 
             self.motors[0].run_direct(duty_cycle_sp = 35)
@@ -413,10 +436,15 @@ class PID:
 
 
                 col = self.cs.bin_data("hhh")
+                if sum(col) == 0:
+                    self.wait_for_cs(35,-35)
+
                 while sum(col) > self.white-300 and turned < 355:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     turned = math.degrees(self.odm.heading) - deg
                     col = self.cs.bin_data("hhh")
+                    if sum(col) == 0:
+                        self.wait_for_cs(35,-35)
                     # print("turned: ", turned,  "heading:", math.degrees(self.odm.heading), "lpos:", lpos, "col", sum(col))
 
 
@@ -520,10 +548,15 @@ class PID:
         for path in self.knots[this_knot]["paths"]:
 
             col = self.cs.bin_data("hhh")
+            if sum(col) == 0:
+                    self.wait_for_cs(35,-35)
+
             while sum(col) > self.white-300:
                 self.odm.update(self.motors[0].position, self.motors[1].position)
                 turned = math.degrees(self.odm.heading) - deg
                 col = self.cs.bin_data("hhh")
+                if sum(col) == 0:
+                    self.wait_for_cs(35,-35)
                 # print("turned: ", turned,  "heading:", math.degrees(self.odm.heading),  "lpos:", lpos, "col", sum(col))
 
 
@@ -549,12 +582,20 @@ class PID:
                     print("Backtrack Path:", self.backtrack_path)
 
                 col = self.cs.bin_data("hhh")
+                if sum(col) == 0:
+                    self.wait_for_cs(35,-35)
+
                 while sum(col) >= self.mid:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     col = self.cs.bin_data("hhh")
+                    if sum(col) == 0:
+                        self.wait_for_cs(35,-35)
+
                 while sum(col) < self.mid:
                     self.odm.update(self.motors[0].position, self.motors[1].position)
                     col = self.cs.bin_data("hhh")
+                    if sum(col) == 0:
+                        self.wait_for_cs(35,-35)
 
                 for m in self.motors: m.stop()
                 print("Visiting", path_num)
