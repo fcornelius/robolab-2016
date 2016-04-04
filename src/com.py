@@ -19,7 +19,7 @@ class communication:
         self.client.connect('stream-006.inf.tu-dresden.de', port=8883)
         self.client.subscribe('explorer/121', qos=1) # subscribe to topic explorer/001
         print("subscribed to explorer")
-        self.publish('explorer/121', 'ready Wasp')
+        self.publish('explorer/121', 'ready Ogle')
         self.client.loop_start()
 
 
@@ -44,8 +44,8 @@ class communication:
             start_leave = int(path[3])
             end_cord = ' '.join(path[4:6])
             end_enter = int(path[6])
+            self.main.add_path(start_cord, start_leave, end_cord, end_enter)
             if payload not in self.sent:
-                self.main.add_path(start_cord, start_leave, end_cord, end_enter)
                 self.main.got_message = True
 
 

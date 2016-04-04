@@ -39,6 +39,7 @@ class PID:
         self.got_message = False
 
         self.saved_position = {"x": 0, "y": 0}
+        self.heading_sp = None
         self.knots = []
         self.cords = []
         self.map = {}
@@ -212,6 +213,12 @@ class PID:
                 self.wait_for_cs(self.start_power,self.start_power)
 
             self.odm.update(self.motors[0].position, self.motors[1].position)
+            # print("heading_sp:", self.heading_sp, "diff x+y", (self.odm.pos_x - self.saved_position["x"]) + (self.odm.pos_y - self.saved_position["y"]))
+
+            if self.heading_sp is not None and ((self.odm.pos_x - self.saved_position["x"]) + (self.odm.pos_y - self.saved_position["y"])) > 5:
+                print("---  Heading Setpoint reached, setting heading to", self.heading_sp)
+                self.odm.heading = math.radians(self.heading_sp)
+                self.heading_sp = None
 
             if col[0] > col[1] + col[2]:   # Rot erkannt
 
@@ -523,6 +530,20 @@ class PID:
         last_leave_rel = 0
         enter_at_rel = 0
 
+
+
+        # Breitensuche Karte
+
+
+        if not self.backtrack and len(self.knots) > 1:
+
+            last_cord = self.cords[last_knot]
+            print("last cord:", last_cord)
+
+            self.add_path(last_cord,last_leave_rel,cord_str,enter_at_rel)
+
+
+
         # Pfad senden:
 
         if len(self.knots) > 1:
@@ -538,15 +559,6 @@ class PID:
 
 
 
-        # Breitensuche Karte
-
-
-        if not self.backtrack and len(self.knots) > 1:
-
-            last_cord = self.cords[last_knot]
-            print("last cord:", last_cord)
-
-            self.add_path(last_cord,last_leave_rel,cord_str,enter_at_rel)
 
                                                                                                                          #  3 Fälle relevant:
 
@@ -637,8 +649,11 @@ class PID:
                 # ev3.Sound.speak("Visiting {}".format(path_num))
                 if enter_aligned % 90 > 0: abs_deg += 45
                 self.odm.reset(abs_deg % 360 )                                                        # Knoten ansteuern und aus not_visited löschen
+                self.heading_sp = abs_deg % 360
                 self.motors[0].reset()
                 self.motors[1].reset()
+                x = math.floor(self.odm.pos_x)
+                y = math.floor(self.odm.pos_y)
                 self.saved_position["x"] = x
                 self.saved_position["y"] = y
                 self.last_leave = path_num
@@ -750,7 +765,7 @@ class PID:
         deg = 0
         enter %= 350
 
-        if -20 < enter < 20 or 330 < enter < 359:
+        if -20 < enter < 20 or 340 < enter < 359:
             deg = 0
         elif 20 < enter < 65:
             deg = 45
@@ -758,13 +773,13 @@ class PID:
             deg = 90
         elif 110 < enter < 155:
             deg = 135
-        elif 155 < enter < 200:
+        elif 155 < enter < 190:
             deg = 180
-        elif 200 < enter < 245:
+        elif 190 < enter < 245:
             deg = -135
         elif 245 < enter < 290:
             deg = -90
-        elif 290 < enter < 330:
+        elif 290 < enter < 340:
             deg = -45
 
         return deg
