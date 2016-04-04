@@ -190,6 +190,10 @@ class PID:
             time.sleep(1)
             col = self.cs.bin_data("hhh")
         print("Color Sensor working.")
+        self.motors[0].run_to_rel_pos(duty_cycle_sp = -l_duty, position_sp = 20)
+        self.motors[1].run_to_rel_pos(duty_cycle_sp = -r_duty, position_sp = 20)
+        time.sleep(2)
+
         self.motors[0].run_direct(duty_cycle_sp = l_duty)
         self.motors[1].run_direct(duty_cycle_sp = r_duty)
 
@@ -206,16 +210,18 @@ class PID:
         error = 0
         d = 0           # direction (links oder rechts)
         col = ()
-
+        l_turn = 0
+        r_turn = 0
         while True:
             col = self.cs.bin_data("hhh")
             if sum(col) == 0:
-                self.wait_for_cs(self.start_power,self.start_power)
+                for m in self.motors: m.stop()
+                self.wait_for_cs(self.start_power + l_turn, self.start_power + r_turn)
 
             self.odm.update(self.motors[0].position, self.motors[1].position)
             # print("heading_sp:", self.heading_sp, "diff x+y", (self.odm.pos_x - self.saved_position["x"]) + (self.odm.pos_y - self.saved_position["y"]))
 
-            if self.heading_sp is not None and ((self.odm.pos_x - self.saved_position["x"]) + (self.odm.pos_y - self.saved_position["y"])) > 5:
+            if self.heading_sp is not None and (math.fabs(self.odm.pos_x - self.saved_position["x"]) + math.fabs(self.odm.pos_y - self.saved_position["y"])) > 5:
                 print("---  Heading Setpoint reached, setting heading to", self.heading_sp)
                 self.odm.heading = math.radians(self.heading_sp)
                 self.heading_sp = None
@@ -236,6 +242,9 @@ class PID:
             l_turn = turn
             r_turn = -turn
 
+            col = self.cs.bin_data("hhh")
+            if sum(col) == 0:
+                self.wait_for_cs(self.start_power,self.start_power)
 
             self.motors[0].duty_cycle_sp = self.start_power + l_turn
             self.motors[1].duty_cycle_sp = self.start_power + r_turn
@@ -254,23 +263,6 @@ class PID:
         print("\n\n\n--------------------------------------------\n")
         x = math.floor(self.odm.pos_x)
         y = math.floor(self.odm.pos_y)
-        # print("Absolute pos:",x, y)
-
-        # Weiter vorfahren:
-
-        # for m in self.motors:
-        #     m.stop()
-
-        # ev3.Sound.speak("left {} right {}".format(self.motors[0].duty_cycle_sp,self.motors[1].duty_cycle_sp)).wait()
-
-        # #Rotausgleich
-        #
-        # c = self.motors[0].duty_cycle_sp - self.motors[1].duty_cycle_sp
-        # self.motors[1].run_to_rel_pos(position_sp=1.0 * c, duty_cycle_sp = 30)
-        #
-        # while self.motors[1].speed > 0:
-        #     self.odm.update(self.motors[0].position, self.motors[1].position)
-
 
 
         self.motors[0].run_direct(duty_cycle_sp = 30)
@@ -353,7 +345,9 @@ class PID:
 
 
         print("\n\nX, Y:", cord_str)
-
+        col = self.cs.bin_data("hhh")
+        if sum(col) == 0:
+            self.wait_for_cs(30,30)
 
         # Fertig?
 
@@ -399,10 +393,13 @@ class PID:
         print("\n\nEnter:", enter_deg,"\n")
         print("Enter aligned:", self.align_enter(enter_deg),"\n")
 
-        if not self.backtrack: self.knots[this_knot]["last_enter"] = enter_at
+        go_back = False
+        if not self.backtrack and not known_knot:
+            self.knots[this_knot]["last_enter"] = enter_at
+        elif not self.backtrack and known_knot:
+            go_back = True
+
         print("Last enter:", self.knots[this_knot]["last_enter"])
-
-
 
 
         # Nach Norden ausrichten:
@@ -511,14 +508,6 @@ class PID:
 
 
 
-        # quit()
-
-        # print("turned:", turned, "Deg after Turn:", math.degrees(self.odm.heading))
-
-
-
-        # deg = math.degrees(self.odm.heading)
-        # lpos = self.motors[0].position
 
         if enter_at in self.knots[this_knot]["not_visited"]:
             self.knots[this_knot]["not_visited"].remove(enter_at)
@@ -615,10 +604,13 @@ class PID:
 
             print("\nchecking ",enter_deg,"(", enter_aligned,") +",corrected_turn,"(",abs_deg,") =", abs_deg," for pathnum. -> Path", path_num)
 
-
+            col = self.cs.bin_data("hhh")
+            if sum(col) == 0:
+                self.wait_for_cs(35,-35)
 
             if (len(self.knots[this_knot]["not_visited"]) > 0 and path_num == min(self.knots[this_knot]["not_visited"]) and not self.backtrack and not self.navigate) \
-                or (self.backtrack and path_num == self.knots[this_knot]["last_enter"] and not self.navigate) \
+                or (self.backtrack and not go_back and path_num == self.knots[this_knot]["last_enter"] and not self.navigate) \
+                or (go_back and path_num == enter_at and not self.navigate) \
                 or self.navigate and rel_path == self.navigate[0]:                                                        # Unbesuchter Pfad oder soll zurück oder auf Rückweg oder navigiert
 
                 if self.navigate:

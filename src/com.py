@@ -15,11 +15,11 @@ class communication:
 
     def connect(self):
         self.client.on_message = self.received
-        self.client.username_pw_set('121', password='ydpGX5bMNY')
+        self.client.username_pw_set('126', password='ydpGX5bMNY')
         self.client.connect('stream-006.inf.tu-dresden.de', port=8883)
         self.client.subscribe('explorer/121', qos=1) # subscribe to topic explorer/001
         print("subscribed to explorer")
-        self.publish('explorer/121', 'ready Ogle')
+        self.publish('explorer/121', 'ready Gliese')
         self.client.loop_start()
 
 
