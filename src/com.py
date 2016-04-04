@@ -10,6 +10,7 @@ class communication:
 
         self.main = pid
         self.planet_topic = ""
+        self.sent = []
 
 
     def connect(self):
@@ -24,6 +25,7 @@ class communication:
 
     def send_path(self, path_str):
         self.publish(self.planet_topic, "path " + path_str)
+        self.sent.append("path " + path_str)
         print("Sent path '{}' topic: '{}'".format("path " + path_str, self.planet_topic))
 
     def publish(self, topic, payload):
@@ -42,7 +44,10 @@ class communication:
             start_leave = int(path[3])
             end_cord = ' '.join(path[4:6])
             end_enter = int(path[6])
-            self.main.add_path(start_cord, start_leave, end_cord, end_enter)
+            if payload not in self.sent:
+                self.main.add_path(start_cord, start_leave, end_cord, end_enter)
+                self.main.got_message = True
+
 
         elif payload.split(' ')[0] == 'target':
             target = payload.split(' ')

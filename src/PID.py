@@ -15,8 +15,8 @@ class PID:
         self.white = 0
         self.black = 0
 
-        # self.black = 91
-        # self.white = 665
+        # self.black = 93
+        # self.white = 688
 
         self.err = 0
         self.mid = 0
@@ -26,15 +26,17 @@ class PID:
         self.start_power = 30
         self.power_offset = -5
 
-        # self.init_mqtt()
+
         self.init_comp()
-        self.calibrate(self.cs)
         self.odm = odometer.odometry()
+
+
 
         self.start_x = 0
         self.start_y = 0
         self.target = None
         self.navigate = None
+        self.got_message = False
 
         self.saved_position = {"x": 0, "y": 0}
         self.knots = []
@@ -46,6 +48,7 @@ class PID:
         self.backtrack_path = []
 
         self.com = None
+        self.calibrate(self.cs)
 
 
     def init_comp(self):
@@ -61,22 +64,43 @@ class PID:
     def calibrate(self,cs):
 
         print("\n" * 20)
+        time.sleep(1)
+        self.black = sum(cs.bin_data("hhh"))
 
-        if self.white == 0:
-            input("Place sensor on white area")
-            self.white = sum(cs.bin_data("hhh"))
-            input("Place sensor on black area")
-            self.black = sum(cs.bin_data("hhh"))
-            print("Calibrated to black: ", self.black, " white: ", self.white)
-            input("Position at line")
+        self.motors[0].run_direct(duty_cycle_sp = 40)
+        col = sum(cs.bin_data("hhh"))
+        print("black:", col)
+        self.odm.update(self.motors[0].position, self.motors[1].position)
+        deg = math.degrees(self.odm.heading)
+        while deg < 30:
+            self.odm.update(self.motors[0].position, self.motors[1].position)
+            deg = math.degrees(self.odm.heading)
+            col = sum(cs.bin_data("hhh"))
+            print("col:",col, "deg:", deg)
 
+        self.white = sum(cs.bin_data("hhh"))
+        print("\nWhite:", self.white, " Black: ", self.black)
+
+        self.white = sum(cs.bin_data("hhh"))
         self.mid = (self.white+self.black)/2          # error = col-mid
         err_max = (self.white-self.black)/2
+
+        self.motors[0].run_direct(duty_cycle_sp = -40)
+
+        while sum(cs.bin_data("hhh")) > self.mid:
+            self.odm.update(self.motors[0].position, self.motors[1].position)
+
+        for m in self.motors: m.stop()
+
+        # quit()
+
+
+
 
         self.m = -(self.start_power/err_max) # + 0.008    # turn = slo*error
         self.i = self.m/40
         self.d = self.m -0.2
-        print("White:", self.white, " Black: ", self.black, " m: ", self.m, "i:", self.i, "d:", self.d)
+
 
 
 
@@ -376,6 +400,7 @@ class PID:
 
         # Nach Norden ausrichten:
 
+        north = 45 if enter_aligned % 90 > 0 else 5
         print("Enter at", enter_at)
         if enter_at != 3:
             print("Going north")
@@ -385,19 +410,20 @@ class PID:
                 self.motors[0].run_direct(duty_cycle_sp = 35)
                 self.motors[1].run_direct(duty_cycle_sp = -35)
 
-                while enter_aligned + (math.degrees(self.odm.heading) - deg) < -5:
+                while enter_aligned + (math.degrees(self.odm.heading) - deg) < north-10:
                     # print(math.degrees(self.odm.heading))
                     self.odm.update(self.motors[0].position, self.motors[1].position)
             else:
                 self.motors[0].run_direct(duty_cycle_sp = -35)
                 self.motors[1].run_direct(duty_cycle_sp = 35)
 
-                while enter_aligned + (math.degrees(self.odm.heading) - deg) > 5:
+                while enter_aligned + (math.degrees(self.odm.heading) - deg) > north:
                     # print(math.degrees(self.odm.heading))
                     self.odm.update(self.motors[0].position, self.motors[1].position)
 
             # for m in self.motors: m.stop()
-            # quit()
+            # print("heading",math.degrees(self.odm.heading))
+            # time.sleep(4)
 
 
 
@@ -408,20 +434,22 @@ class PID:
         lpos = self.motors[0].position
 
 
-        # 30 Grad nach links
+        # 20 Grad nach links
 
         self.motors[0].run_direct(duty_cycle_sp = -35)
         self.motors[1].run_direct(duty_cycle_sp = 35)
 
-        while turned > -10:
+        while turned > -25:
             self.odm.update(self.motors[0].position, self.motors[1].position)
             turned = math.degrees(self.odm.heading) - deg
         # print("turned:  ", turned)
         # print("deg: ", math.degrees(self.odm.heading))
 
         deg = math.degrees(self.odm.heading)
-
-        for m in self.motors: m.stop()
+        print("deg:", deg)
+        # for m in self.motors: m.stop()
+        # time.sleep(4)
+        turned = 0
 
         # Kanten Scan, falls neuer Knoten
 
@@ -452,13 +480,13 @@ class PID:
 
 
 
-                if turned < 335:
+                if turned < 300:
 
-
-                    abs_deg = self.turn_to_real_deg(turned-10)
+                    corrected_turn = turned if turned < 20 else turned+10
+                    abs_deg = self.turn_to_real_deg(corrected_turn)
                     path_num = self.deg_to_pathnum(abs_deg)
 
-                    print("Path found. Turned:", turned-10, "to real:", self.turn_to_real_deg(turned-10), "Absolute Degrees:", abs_deg, "-> Adding Path", path_num)
+                    print("Path found. Turned:", corrected_turn, "to real:", abs_deg, "-> Adding Path", path_num)
 
                     if path_num not in self.knots[this_knot]["paths"]:
                         self.knots[this_knot]["not_visited"].append(path_num)
@@ -501,7 +529,13 @@ class PID:
             last_leave_rel = self.knots[last_knot]["paths"].index(self.last_leave) + 1
             enter_at_rel   = self.knots[this_knot]["paths"].index(enter_at) + 1
             self.send_path(self.cords[last_knot], last_leave_rel, cord_str, enter_at_rel)
-            time.sleep(4)
+            time.sleep(3)
+            if self.got_message:
+                ev3.Sound.tone([(300, 100, 20), (300, 100, 100)])
+                self.got_message = False
+            else:
+                ev3.Sound.tone([(100, 100, 100)])
+
 
 
         # Breitensuche Karte
@@ -562,11 +596,12 @@ class PID:
 
 
             lpos = self.motors[0].position
-            abs_deg = self.turn_to_real_deg(turned-10)
+            corrected_turn = turned if turned < 20 else turned+10
+            abs_deg = self.turn_to_real_deg(corrected_turn)
             path_num = self.deg_to_pathnum(abs_deg)
             rel_path += 1
 
-            print("\nchecking ",enter_deg,"(", enter_aligned,") +",turned-10,"(",self.turn_to_real_deg(turned-10),") =", abs_deg," for pathnum. -> Path", path_num)
+            print("\nchecking ",enter_deg,"(", enter_aligned,") +",corrected_turn,"(",abs_deg,") =", abs_deg," for pathnum. -> Path", path_num)
 
 
 
@@ -601,7 +636,7 @@ class PID:
                 print("Visiting", path_num)
                 # ev3.Sound.speak("Visiting {}".format(path_num))
                 if enter_aligned % 90 > 0: abs_deg += 45
-                self.odm.reset(abs_deg % 360 + 10)                                                        # Knoten ansteuern und aus not_visited löschen
+                self.odm.reset(abs_deg % 360 )                                                        # Knoten ansteuern und aus not_visited löschen
                 self.motors[0].reset()
                 self.motors[1].reset()
                 self.saved_position["x"] = x
